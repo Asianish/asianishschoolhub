@@ -2223,7 +2223,7 @@ function geditView(){
 
     <section>
       <div class="sh"><h2>Вправи наприкінці теми <span class="small muted num">(${e.ex.length})</span></h2>
-        <div class="row"><button class="btn sm" data-act="gedAddEx" data-arg="choice">+ Вибір відповіді</button><button class="btn sm" data-act="gedAddEx" data-arg="order">+ Складіть речення</button>${S.sample ? `<button class="btn sm gold" data-act="gedAI" ${e.busy ? "disabled" : ""}>${e.busy === "ai" ? "Складаю…" : "Запропонувати вправи з ШІ"}</button>` : ""}</div></div>
+        <div class="row"><button class="btn sm" data-act="gedAddEx" data-arg="choice">+ Вибір відповіді</button><button class="btn sm" data-act="gedAddEx" data-arg="order">+ Складіть речення</button></div></div>
       <div class="stack" style="gap:12px">${exRows || emptyBox("练", "Вправ ще немає", "Додайте хоча б одну, щоб студенти могли перевірити себе.")}</div>
       ${e.msg ? `<p class="small" style="margin-top:10px;color:var(--gold-ink);font-weight:600">${esc(e.msg)}</p>` : ""}
     </section>
@@ -2995,20 +2995,17 @@ const GAMES = [
   {id:"ctx",     cat:"ctx",   glyph:"文", name:"Context Detective",       desc:"Короткий текст із пропусками — вставте слова з банку."},
   {id:"usage",   cat:"ctx",   glyph:"用", name:"Vocabulary in Context",   desc:"Слово й кілька речень: де його вжито правильно?"},
   {id:"fix",     cat:"ctx",   glyph:"改", name:"Fix the Mistake",         desc:"Знайдіть неправильне слово в реченні й замініть його."},
-  {id:"rewrite", cat:"ctx",   glyph:"换", name:"Sentence Transformation", desc:"Перепишіть речення з новим словом, не змінюючи змісту.", ai:true},
   {id:"clue",    cat:"mem",   glyph:"探", name:"Word Detective",          desc:"Три підказки по черзі — вгадайте слово якомога раніше."},
   {id:"recall",  cat:"mem",   glyph:"忆", name:"Vocabulary Recall",       desc:"Запам'ятайте слова за 10 секунд і знайдіть їх."},
   {id:"groups",  cat:"mem",   glyph:"类", name:"Semantic Groups",         desc:"Розкладіть слова за темами уроків."},
   {id:"desc",    cat:"mem",   glyph:"述", name:"Describe Without Saying", desc:"Опишіть слово, не називаючи його, — ШІ вгадує.", ai:true},
   {id:"arch",    cat:"write", glyph:"建", name:"Sentence Architect",      desc:"Зберіть китайське речення з частин за перекладом."},
   {id:"wia",     cat:"write", glyph:"造", name:"Word in Action",          desc:"Придумайте власне речення зі словом — ШІ перевірить.", ai:true},
-  {id:"tr",      cat:"write", glyph:"译", name:"Translation Lab",         desc:"Перекладіть речення з української китайською.", ai:true},
   {id:"essay",   cat:"write", glyph:"作", name:"Mini Essay",              desc:"Короткий текст, у якому треба вжити 5 слів уроку.", ai:true},
   {id:"adet",    cat:"audio", glyph:"侦", name:"Audio Detective",         desc:"Прослухайте речення: яке слово уроку в ньому прозвучало?"},
   {id:"lrec",    cat:"audio", glyph:"复", name:"Listen & Reconstruct",    desc:"Прослухайте речення й складіть його з частин."},
   {id:"dict",    cat:"audio", glyph:"默", name:"Dictation",               desc:"Прослухайте слово й запишіть його ієрогліфами або піньїнем."},
   {id:"sound",   cat:"audio", glyph:"辨", name:"Sound Discrimination",    desc:"Два схожі за звучанням слова — яке прозвучало?"},
-  {id:"story",   cat:"sim",   glyph:"故", name:"Build the Story",         desc:"Оберіть слова — помічник складе історію, яку можна прослухати.", ai:true},
   {id:"sim",     cat:"sim",   glyph:"话", name:"Ситуації й діалоги",      desc:"Кафе, магазин, подорож, знайомство, несподівана ситуація, листування.", ai:true},
   {id:"escape",  cat:"game",  glyph:"门", name:"Vocabulary Escape Room",  desc:"Три кімнати із загадками — відчиніть усі двері."},
   {id:"boss",    cat:"game",  glyph:"王", name:"Boss Level",              desc:"Підсумкове випробування: 15 різних завдань і 3 життя."},
