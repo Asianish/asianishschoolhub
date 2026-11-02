@@ -513,6 +513,22 @@ b,strong{font-family:var(--f-ui);font-weight:600}
 .medal-b.silver{--c1:#F1F2F0;--c2:#9AA09D}
 .medal-b.gold{--c1:#F4DC9A;--c2:#C9A15D}
 .medal-b.jade{--c1:#9FD6BE;--c2:#2F7A57}
+.hwcard{display:flex;flex-direction:column;gap:12px}.hwcard.todo,.hwcard.redo{border-color:var(--gold)}
+.hwhead{all:unset;cursor:pointer;display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.hwhead:focus-visible{outline:2px solid var(--gold);outline-offset:4px;border-radius:6px}
+.hwtext{white-space:normal;line-height:1.6;overflow-wrap:anywhere;background:var(--surface-2,rgba(201,161,93,.08));border-radius:10px;padding:12px 14px}
+.hwtext a{color:var(--gold-ink);text-decoration-thickness:1px}
+.hwtasks{display:flex;flex-direction:column;gap:6px;flex:1;min-width:0}
+.hwtask{display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font:inherit;color:var(--fg);text-align:left;cursor:pointer;width:100%}
+button.hwtask:hover{border-color:var(--gold)}.hwtask.static{cursor:default}.hwtask .tg{font-family:var(--f-han);color:var(--gold-ink);font-size:1.15rem;flex:none}
+.hwtask .tl{flex:1;min-width:0;overflow-wrap:anywhere}.hwtask .go{color:var(--gold-ink);font-size:.8rem;flex:none}
+.hwadd{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;align-items:end;margin-top:6px}
+.hwres{display:flex;flex-direction:column;gap:4px;border-top:1px dashed var(--line);padding-top:8px}.hwresr{display:flex;align-items:center;gap:8px;font-size:.9rem}.hwresr .tg{font-family:var(--f-han);color:var(--gold-ink);flex:none}.hwresr .tl{flex:1;min-width:0;overflow-wrap:anywhere}.hwresr .pill{flex:none}
+.hwrow{display:flex;gap:10px;align-items:flex-start}.hwic{font-family:var(--f-han);color:var(--gold-ink);font-size:1.1rem;line-height:1.6}
+.hwitem{display:flex!important;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer;width:100%;font:inherit;color:var(--fg);text-align:left}.hwitem:hover{border-color:var(--gold)}
+.hwchks{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:4px}.hwchk{display:inline-flex;gap:6px;align-items:center;cursor:pointer}.hwset{border:0;padding:0;margin:0}.hwset legend{font-weight:600;margin-bottom:4px}
+.hwstud.sent{border-color:var(--gold)}.late{color:#B3261E;font-weight:600}.hwnudge{cursor:pointer;width:100%;text-align:left;font:inherit;border:1px solid var(--gold)}
+.pill.warn{background:#fbe9d9;color:#8a4b14}
+.tbadge{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--gold);color:#23483F;font-size:.7rem;font-weight:800;margin-left:4px;vertical-align:1px}
 .medal-b.sm{width:38px;height:38px}.medal-b.sm .han{font-size:1.05rem}
 .tstrip{display:flex!important;flex-direction:row!important;align-items:center;gap:14px;flex-wrap:wrap;width:100%;text-align:left;cursor:pointer;padding:12px 18px!important;font:inherit;color:var(--fg)}
 .tstrip:hover{border-color:var(--gold)}
@@ -650,7 +666,7 @@ body{background-color:#F8F5EF;background-image:radial-gradient(900px 600px at 0%
   window.ASIANISH_SB = sb;
 
   // ---------- маленька «база документів» поверх таблиць Supabase ----------
-  const TABLES = new Set(["settings","teachers","classes","lessons","grammar","cvocab","students","progress","staff","materials"]);
+  const TABLES = new Set(["settings","teachers","classes","lessons","grammar","cvocab","students","progress","staff","materials","homework","hwsub","hwfb"]);
   const err = (e, code) => Object.assign(new Error(e?.message || String(e)), {code: code || e?.code || "error", cause: e});
   const split = path => { const i = path.indexOf("/"); const t = path.slice(0, i), id = path.slice(i + 1); if (!TABLES.has(t) || !id) throw err("bad path " + path, "invalid"); return [t, id]; };
   const clone = o => o == null ? o : JSON.parse(JSON.stringify(o));
@@ -739,7 +755,7 @@ body{background-color:#F8F5EF;background-image:radial-gradient(900px 600px at 0%
   };
   window.ASIANISH_IMPORT_HTML = () => `<div class="form panel" style="max-width:640px">
       <h2>Перенесення даних</h2>
-      <p class="small muted">Оберіть файл, який підготував ШІ: уроки, граматика, групи, викладачі або нові вправи. Файли з доповненнями (наприклад, вправи на граматику) лише додають нове і нічого не перезаписують.</p>
+      <p class="small muted">Оберіть файл оновлення: уроки, граматика, групи, викладачі або нові вправи. Файли з доповненнями (наприклад, вправи на граматику) лише додають нове і нічого не перезаписують.</p>
       <input class="input" type="file" id="import-file" accept=".json,application/json">
       <div id="import-msg" class="note" hidden role="status"></div>
     </div>`;
@@ -1173,6 +1189,11 @@ async function boot(){
   db.collection("lessons").onSnapshot(q => { S.lessons = {}; q.docs.forEach(d => S.lessons[d.id] = {...d.data(), id: d.id}); S.loaded.lessons = true; onData(); }, fail);
   db.collection("grammar").onSnapshot(q => { S.grammar = {}; q.docs.forEach(d => S.grammar[d.id] = {...d.data(), id: d.id}); S.loaded.grammar = true; onData(); }, fail);
   db.collection("students").onSnapshot(q => { S.students = {}; q.docs.forEach(d => S.students[d.id] = d.data()); S.loaded.students = true; syncMe(); onData(); }, fail);
+  // Homework: the database rules decide what each person receives (a student gets only tasks for her and her own answers).
+  [["homework", "hw"], ["hwsub", "hwsub"], ["hwfb", "hwfb"]].forEach(([col, key]) => db.collection(col).onSnapshot(q => {
+    S[key] = {}; q.docs.forEach(d => S[key][d.id] = {...d.data(), id: d.id}); S.hwMissing = false;
+    if (S.phase === "ready" && !document.activeElement?.closest?.("form.hwform,[data-form=hwSave],[data-form=hwCheck]")) render();
+  }, e => { fail(e); S.hwMissing = true; }));
   // Skills progress: staff read every student's doc; a student can read only her own (database rules enforce this).
   if (S.isTeacher) db.collection("progress").onSnapshot(q => { S.progs = {}; q.docs.forEach(d => S.progs[d.id] = d.data()); if (S.phase === "ready" && !S.pedit && !S.medit && S.view.tab === "prog") render(); }, () => {});
   else if (S.uid) db.doc("progress/" + S.uid).onSnapshot(sn => { S.myProg = sn.exists ? sn.data() : null; if (S.phase === "ready" && S.view.tab === "prog") render(); }, () => {});
@@ -1366,6 +1387,7 @@ function teacherView(){
   if (v.name === "class" && S.classes[v.id]) return classView(S.classes[v.id]);
   if (v.name === "library") return libraryView();
   if (v.name === "awards") return tAwardsView();
+  if (v.name === "hw") return hwStaffView();
   if (v.name === "edit") return editorView();
   if (v.name === "gedit") return geditView();
   if (v.name === "rank") return `<div class="stack">${backCrumb("Рейтинг")}${rankView(true, "")}</div>`;
@@ -1531,6 +1553,7 @@ function adminHome(){
         <button class="excard" data-act="go" data-arg="materials"><span class="glyph">材</span><b>Матеріали</b><span class="small muted">Посилання на Miro, Canva, Drive, відео й ігри — у папках за рівнями.</span></button>
         <button class="excard" data-act="go" data-arg="codes"><span class="glyph">码</span><b>Коди для входу</b><span class="small muted">Таблиця кодів усіх груп і учнів з готовим повідомленням — копіюйте одним натиском.</span></button>
         <button class="excard" data-act="go" data-arg="library"><span class="glyph">课</span><b>Бібліотека</b><span class="small muted">Спільна лексика й граматика HSK для всіх викладачів.</span></button>
+        <button class="excard" data-act="go" data-arg="hw"><span class="glyph">作</span><b>Домашні завдання</b><span class="small muted">Задати ДЗ групі чи учню: текст, сторінки підручника, посилання. Перевірка й коментарі.</span></button>
         <button class="excard" data-act="go" data-arg="awards"><span class="glyph">奖</span><b>Нагороди викладачів</b><span class="small muted">${TACH.length} нагород за успіхи учнів, матеріали й відгуки, «Викладач місяця» та номінації від школи.</span></button>
         <button class="excard" data-act="go" data-arg="rank"><span class="glyph">榜</span><b>Рейтинг</b><span class="small muted">Спільний рейтинг усіх студентів китайської, з фільтром за викладачем і групою.</span></button>
         <button class="excard" data-act="go" data-arg="settings"><span class="glyph">设</span><b>Налаштування</b><span class="small muted">Назва школи, команда й доступи.</span></button>
@@ -1571,6 +1594,7 @@ function teacherHome(t){
         <button class="excard" data-act="go" data-arg="materials"><span class="glyph">材</span><b>Матеріали</b><span class="small muted">Посилання на Miro, Canva, Drive, відео й ігри — у папках за рівнями.</span></button>
         <button class="excard" data-act="go" data-arg="codes"><span class="glyph">码</span><b>Коди для входу</b><span class="small muted">Таблиця кодів усіх груп і учнів з готовим повідомленням — копіюйте одним натиском.</span></button>
         <button class="excard" data-act="go" data-arg="library"><span class="glyph">课</span><b>Бібліотека</b><span class="small muted">Спільна лексика й граматика HSK. Зміни одразу бачать усі студенти.</span></button>
+        <button class="excard" data-act="go" data-arg="hw"><span class="glyph">作</span><b>Домашні завдання</b><span class="small muted">Задати ДЗ групі чи учню: текст, сторінки підручника, посилання. Перевірка й коментарі.</span></button>
         <button class="excard" data-act="go" data-arg="awards"><span class="glyph">奖</span><b>Нагороди викладачів</b><span class="small muted">${TACH.length} нагород за успіхи учнів, матеріали й відгуки, «Викладач місяця» та номінації від школи.</span></button>
         <button class="excard" data-act="go" data-arg="rank"><span class="glyph">榜</span><b>Рейтинг</b><span class="small muted">Спільний рейтинг усіх студентів китайської; фільтр «Мої учні» та за групами.</span></button>
         ${admin ? "" : `<button class="excard" data-act="go" data-arg="settings"><span class="glyph">设</span><b>Мій профіль і доступ</b><span class="small muted">Ім'я, предмет, ваша роль.</span></button>`}
@@ -1906,7 +1930,7 @@ function mySkillsTab(){
 
 function classView(c){
   const tab = S.view.tab || "overview";
-  const tabs = tabsHtml([["overview","Огляд"],["prog","Прогрес"],["lessons","Лексика за рівнями"],["cvl","Лексика з уроків"],["cards","Картки"],["grammar","Граматика"],["ex","Вправи"],["rank","Рейтинг"],["settings","Налаштування"]], tab);
+  const tabs = tabsHtml([["overview","Огляд"],["prog","Прогрес"],["lessons","Лексика за рівнями"],["cvl","Лексика з уроків"],["cards","Картки"],["grammar","Граматика"],["ex","Вправи"],["hw","ДЗ"],["rank","Рейтинг"],["settings","Налаштування"]], tab);
   let body = "";
   if (tab === "overview") body = classOverview(c);
   else if (tab === "lessons") body = classLessons(c);
@@ -1917,6 +1941,7 @@ function classView(c){
   else if (tab === "prog") body = classSkills(c);
   else if (tab === "rank") body = rankView(true, c.id);
   else if (tab === "settings") body = classSettings(c);
+  else if (tab === "hw") body = hwListStaff(c.id);
   return `<div class="stack">
     ${backCrumb(c.name)}
     <div class="spread"><div><div class="eyebrow">${c.kind === "individual" ? "Індивідуальне навчання" : "Група"} · ${esc(lvName(c.course || "HSK1"))}${ageBadge(c) ? " · " + ageBadge(c) : ""}</div><h1 class="pt">${esc(c.name)}</h1>${c.schedule ? `<div class="row" style="margin-top:10px;gap:6px">${scheduleChips(c.schedule)}</div>` : ""}</div>
@@ -2459,7 +2484,9 @@ function studentView(){
     else if (tab === "cv") body = cvStudentView();
     else if (tab === "bank") body = bankView();
     else if (tab === "ach") body = achView();
-    inner = tabsHtml([["dash","Кабінет"],["prog","Прогрес"],["cards","Картки"],["ex","Вправи"],["cv","Лексика з уроків"],["bank","Банка слів"],["ach","Нагороди"],["rank","Рейтинг"],["profile","Профіль"]], tab) + `<div class="stack">${body}</div>`;
+    else if (tab === "hw") body = hwStudentView();
+    const hwN = hwMyPending();
+    inner = tabsHtml([["dash","Кабінет"],["hw", "ДЗ" + (hwN ? ` <span class="tbadge">${hwN}</span>` : "")],["prog","Прогрес"],["cards","Картки"],["ex","Вправи"],["cv","Лексика з уроків"],["bank","Банка слів"],["ach","Нагороди"],["rank","Рейтинг"],["profile","Профіль"]], tab) + `<div class="stack">${body}</div>`;
   }
   return `<div class="stack">
     <div class="stuhead"><div class="stuname"><div class="eyebrow">${c ? esc(c.name) + (c.schedule ? " · " + esc(c.schedule) : "") : "Без групи"}${S.teachers[c?.teacherId] ? " · викладач " + esc(S.teachers[c.teacherId].name) : ""}</div><h1 class="pt">${esc(S.me.name)}</h1></div><div class="stutools">${pomoHtml()}${modeSwitch(S.mode)}</div></div>
@@ -2468,6 +2495,7 @@ function studentView(){
       <span class="fb-t"><b>Безкоштовні уроки</b><span class="small muted">Відеоуроки Asianish School на YouTube — китайська, корейська, японська</span></span>
       <span class="fb-go">Відкрити <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg></span></a>` : ""}
     ${storeNote}
+    ${S.hwRun && (S.mode === "grammar" || S.view.tab !== "hw") ? hwReturnBar() : hwNudge()}
     ${inner}
   </div>`;
 }
@@ -2964,6 +2992,247 @@ function tAwardsStrip(t){
   const last = [...tManual(t).map(x => ({han: x.han || "奖", tier: x.tier || "gold", name: x.title})), ...got.slice().reverse()].slice(0, 8);
   return `<button class="panel tstrip" data-act="go" data-arg="awards" aria-label="Нагороди викладача"><span class="eyebrow">奖 · Нагороди</span>
     <span class="tmedals">${last.map(a => `<span title="${esc(a.name)}">${medal(a, true, "sm")}</span>`).join("")}</span><span class="small muted">${n} ${plural(n, "нагорода", "нагороди", "нагород")} →</span></button>`;
+}
+
+// =====================================================================
+// HOMEWORK — «Домашні завдання». Teacher assigns to groups, individual students or chosen students of a group;
+// students answer with text and/or a link (no photo uploads — nothing heavy is stored), teacher checks and comments.
+// Collections: homework (task), hwsub (one answer per student: id = hwId:sid), hwfb (teacher's check, same id).
+// =====================================================================
+const HW_MAX = 3000;
+const hwSafeUrl = u => { u = String(u || "").trim(); if (!u) return ""; if (!/^https?:\/\//i.test(u)) u = "https://" + u; try { const x = new URL(u); return /^https?:$/.test(x.protocol) ? x.href : ""; } catch(e){ return ""; } };
+const hwHost = u => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch(e){ return "Посилання"; } };
+const hwText = s => esc(s || "").replace(/(https?:\/\/[^\s<]+[^\s<.,;:!?)\]'"])/g, m => `<a href="${m}" target="_blank" rel="noopener noreferrer">${m}</a>`).replace(/\n/g, "<br>");
+const hwAll = () => Object.values(S.hw || {}).sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")) || (b.createdAt || 0) - (a.createdAt || 0));
+const hwKey = (hid, sid) => hid + ":" + sid;
+const hwSub = (hid, sid) => S.hwsub?.[hwKey(hid, sid)] || null;
+const hwFb = (hid, sid) => S.hwfb?.[hwKey(hid, sid)] || null;
+const hwDueTxt = h => h.due ? fmtDate(h.due) : "без терміну";
+const hwLate = h => h.due && h.due < today();
+// who must do it: every registered student of the chosen classes + individually chosen students
+function hwTargets(h){
+  const cls = new Set(h.classIds || []), sids = new Set(h.sids || []);
+  return Object.entries(S.students).filter(([id, st]) => cls.has(st.classId) || sids.has(id));
+}
+const hwForMe = h => { const c = S.testAs ? S.testAs.classId : S.me?.classId; return (c && (h.classIds || []).includes(c)) || (!S.testAs && S.uid && (h.sids || []).includes(S.uid)); };
+function hwState(h, sid){ const f = hwFb(h.id, sid), s = hwSub(h.id, sid); if (f?.checked && (!s || (f.at || 0) >= (s.at || 0))) return "checked"; if (s?.at) return f?.redo && (f.at || 0) > s.at ? "redo" : "sent"; return f?.redo ? "redo" : "todo"; }
+const HW_ST = {todo: ["Не здано", "soft"], sent: ["Здано · чекає перевірки", "gold"], checked: ["Перевірено", "ok"], redo: ["Треба доопрацювати", "warn"]};
+function hwMyPending(){ if (!S.me || staffUI()) return 0; const sid = S.testAs ? "" : S.uid; return hwAll().filter(h => hwForMe(h) && !h.hidden && ["todo", "redo"].includes(hwState(h, sid))).length; }
+function hwTargetsLabel(h){
+  const parts = (h.classIds || []).map(id => S.classes[id]?.name).filter(Boolean);
+  const extra = (h.sids || []).map(id => S.students[id] ? dispName(S.students[id]) : null).filter(Boolean);
+  return [...parts, ...extra].join(", ") || "нікому не призначено";
+}
+function hwExtras(h, student){
+  const links = (h.links || []).filter(l => l && l.url);
+  const L = h.lessonId && S.lessons[h.lessonId], G = h.gramId && S.grammar[h.gramId];
+  return `${h.pages ? `<div class="hwrow"><span class="hwic" aria-hidden="true">书</span><span><b>Підручник:</b> ${esc(h.pages)}</span></div>` : ""}
+    ${links.length ? `<div class="hwrow"><span class="hwic" aria-hidden="true">链</span><span class="row" style="gap:6px">${links.map(l => `<a class="btn sm" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.title || hwHost(l.url))} ↗</a>`).join("")}</span></div>` : ""}
+    ${hwTasksHtml(h, student)}${false ? `<div class="hwrow"><span class="hwic" aria-hidden="true">练</span><span class="row" style="gap:6px">
+      ${L ? (student ? `<button class="btn sm gold" data-act="deckTab" data-arg="${esc(L.id)}">Картки: ${esc(L.title || L.name || "урок")}</button>` : `<span class="pill soft">Картки: ${esc(L.title || L.name || "урок")}</span>`) : ""}
+      ${G ? (student ? `<button class="btn sm gold" data-act="hwGram" data-arg="${esc(G.id)}">Граматика: ${esc(G.title)}</button>` : `<span class="pill soft">Граматика: ${esc(G.title)}</span>`) : ""}</span></div>` : ""}`;
+}
+// ---------- student ----------
+function hwCardStudent(h){
+  const sid = S.testAs ? "" : S.uid, st = hwState(h, sid), s = hwSub(h.id, sid), f = hwFb(h.id, sid);
+  const open = S.hwOpen === h.id || st === "todo" || st === "redo";
+  const t = S.teachers[h.teacherId];
+  const form = st !== "checked" ? `<form class="form hwform" data-form="hwSubmit" data-id="${esc(h.id)}">
+      ${h.answer !== "check" ? `<div class="field"><label for="hw-t-${esc(h.id)}">Ваша відповідь${hwTasks(h).length ? " (необов'язково, якщо завдання на платформі виконано)" : ""}</label><textarea class="input" id="hw-t-${esc(h.id)}" name="text" rows="4" maxlength="${HW_MAX}" placeholder="Напишіть відповідь, речення чи переклад…">${esc(s?.text || "")}</textarea></div>` : ""}
+      <div class="field"><label for="hw-l-${esc(h.id)}">Посилання на роботу (необов'язково)</label><input class="input" id="hw-l-${esc(h.id)}" name="link" type="text" inputmode="url" autocomplete="off" maxlength="400" value="${esc(s?.link || "")}" placeholder="https://docs.google.com/…"></div>
+      <span class="hint">Фото тут не завантажуються. Письмову роботу можна покласти в Google Drive чи Docs і вставити посилання.</span>
+      <div class="row"><button class="btn primary" type="submit">${s?.at ? "Оновити відповідь" : h.answer === "check" ? "✓ Виконано" : "Здати"}</button>${s?.at ? `<span class="small muted">Здано ${fmtDate(String(s.date || "").slice(0, 10) || today())}</span>` : ""}</div>
+    </form>` : "";
+  return `<article class="panel hwcard ${st}" id="hw-${esc(h.id)}">
+    <button class="hwhead" data-act="hwToggle" data-arg="${esc(h.id)}" aria-expanded="${open}">
+      <span class="stack" style="gap:2px;min-width:0"><b>${esc(h.title)}</b><span class="small muted">${t ? esc(t.name) + " · " : ""}задано ${fmtDate(h.date)} · <span class="${hwLate(h) && (st === "todo" || st === "redo") ? "late" : ""}">до ${hwDueTxt(h)}</span></span></span>
+      <span class="pill ${HW_ST[st][1]}">${HW_ST[st][0]}</span></button>
+    ${open ? `<div class="stack" style="gap:10px">
+      ${h.text ? `<div class="hwtext">${hwText(h.text)}</div>` : ""}
+      ${hwExtras(h, true)}
+      ${f && (f.text || f.mark) ? `<div class="note ${f.redo ? "" : "info"}"><span>${f.redo ? "↺" : "✓"}</span><span><b>${f.redo ? "Викладач просить доопрацювати" : "Коментар викладача"}${f.mark ? ` · оцінка ${esc(f.mark)}` : ""}</b>${f.text ? `<br>${hwText(f.text)}` : ""}</span></div>` : ""}
+      ${st === "checked" && s ? `<div class="small muted">Ваша відповідь:</div><div class="hwtext">${hwText(s.text || "")}${s.link ? `<br><a href="${esc(s.link)}" target="_blank" rel="noopener noreferrer">${esc(s.link)}</a>` : ""}</div>` : ""}
+      ${form}</div>` : ""}
+  </article>`;
+}
+function hwStudentView(){
+  if (S.hwMissing) return emptyBox("作", "Домашні завдання ще не підключені", "Скоро тут з'являться завдання від викладача.");
+  const sid = S.testAs ? "" : S.uid, mine = hwAll().filter(h => hwForMe(h) && !h.hidden);
+  if (!mine.length) return emptyBox("作", "Домашніх завдань поки немає", "Коли викладач задасть ДЗ, воно з'явиться тут.");
+  const by = k => mine.filter(h => k.includes(hwState(h, sid)));
+  const todo = by(["todo", "redo"]).sort((a, b) => String(a.due || "9999").localeCompare(String(b.due || "9999")));
+  const sec = (title, list) => list.length ? `<section class="stack" style="gap:10px"><div class="sh"><h3>${title}</h3><span class="small muted num">${list.length}</span></div>${list.map(hwCardStudent).join("")}</section>` : "";
+  return `${S.testAs ? `<div class="note"><span>🧪</span><span>У режимі студента відповіді не зберігаються.</span></div>` : ""}
+    ${sec("Потрібно зробити", todo)}${sec("Здано, чекає перевірки", by(["sent"]))}${sec("Перевірено", by(["checked"]))}`;
+}
+function hwNudge(){
+  const n = hwMyPending(); if (!n || S.view.tab === "hw" || S.mode === "grammar") return "";
+  return `<button class="note hwnudge" data-act="tab" data-arg="hw"><span>作</span><span><b>${n} ${plural(n, "домашнє завдання", "домашні завдання", "домашніх завдань")}</b> ${plural(n, "чекає", "чекають", "чекають")} на вас →</span></button>`;
+}
+// ---------- teacher ----------
+const hwMyClasses = () => { const tid = staffTid(); return (S.role === "admin" && !tid) ? classesSorted() : classesOf(tid); };
+function staffTid(){ return S.role === "admin" ? (S.view.tid || (S.view.name === "class" ? S.classes[S.view.id]?.teacherId : "") || "") : myTeacherId(); }
+function hwVisibleForStaff(classId){
+  const mineCls = new Set(hwMyClasses().map(c => c.id)), admin = S.role === "admin" && !staffTid();
+  return hwAll().filter(h => classId ? (h.classIds || []).includes(classId) || hwTargets(h).some(([, st]) => st.classId === classId)
+    : admin || h.createdBy === S.uid || (h.classIds || []).some(id => mineCls.has(id)) || hwTargets(h).some(([, st]) => mineCls.has(st.classId)));
+}
+function hwStats(h){ const t = hwTargets(h); let sent = 0, chk = 0; for (const [id] of t){ const s = hwState(h, id); if (s === "sent") sent++; if (s === "checked") { chk++; } } return {n: t.length, sent, chk, wait: sent}; }
+function hwListStaff(classId){
+  if (S.hwMissing) return `<div class="note"><span>⚠</span><span><b>Розділ ДЗ ще не підключено до бази.</b> Адміністраторці потрібно один раз запустити SQL для домашніх завдань у Supabase (SQL Editor → Run), а потім оновити сторінку.</span></div>`;
+  const list = hwVisibleForStaff(classId);
+  return `<div class="spread"><span class="small muted">Учні відповідають текстом або посиланням — без фото.</span><button class="btn primary" data-act="hwNew" data-arg="${esc(classId || "")}">+ Нове ДЗ</button></div>
+    ${list.length ? `<div class="stack" style="gap:10px">${list.map(h => { const s = hwStats(h);
+      return `<button class="panel hwitem" data-act="hwOpenT" data-arg="${esc(h.id)}"><span class="stack" style="gap:2px;min-width:0;text-align:left"><b>${esc(h.title)}${h.hidden ? ` <span class="pill">приховано</span>` : ""}</b>
+        <span class="small muted">${esc(hwTargetsLabel(h))} · задано ${fmtDate(h.date)} · до ${hwDueTxt(h)}</span></span>
+        <span class="row" style="gap:6px;flex:none">${s.wait ? `<span class="pill gold">чекає перевірки: ${s.wait}</span>` : ""}<span class="pill soft num">здали ${s.sent + s.chk}/${s.n}</span></span></button>`; }).join("")}</div>`
+      : emptyBox("作", "Ще немає домашніх завдань", "Натисніть «+ Нове ДЗ»: оберіть групу чи учня, напишіть завдання, сторінки підручника й посилання.")}`;
+}
+function hwStaffView(){
+  const e = S.hwEdit; if (e) return hwEditView(e);
+  const h = S.hwSel && S.hw?.[S.hwSel]; if (h) return hwDetailView(h);
+  return `<div class="stack">${backCrumb("Домашні завдання")}<div><div class="eyebrow">作业 · Домашні завдання</div><h1 class="pt">Домашні завдання</h1></div>${hwListStaff("")}</div>`;
+}
+function hwDetailView(h){
+  const t = hwTargets(h).sort((a, b) => dispName(a[1]).localeCompare(dispName(b[1]), "uk")), s = hwStats(h);
+  const rows = t.map(([id, st]) => { const sub = hwSub(h.id, id), fb = hwFb(h.id, id), state = hwState(h, id), ed = S.hwFbEdit === id;
+    return `<div class="panel hwstud ${state}"><div class="spread"><b>${esc(dispName(st))} <span class="small muted">${esc(S.classes[st.classId]?.name || "")}</span></b><span class="pill ${HW_ST[state][1]}">${HW_ST[state][0]}</span></div>
+      ${sub?.at ? `<div class="hwtext">${sub.text ? hwText(sub.text) : `<span class="muted">${h.answer === "check" ? "Позначено як виконане" : "Без тексту"}</span>`}${sub.link ? `<br><a href="${esc(sub.link)}" target="_blank" rel="noopener noreferrer">${esc(sub.link)}</a>` : ""}</div><span class="small muted">здано ${fmtDate(String(sub.date || "").slice(0, 10))}</span>` : ""}
+      ${hwResRow(h, id)}
+      ${fb && (fb.text || fb.mark) && !ed ? `<div class="small"><b>Ваш коментар${fb.mark ? " · оцінка " + esc(fb.mark) : ""}:</b> ${hwText(fb.text || "")}</div>` : ""}
+      ${ed ? `<form class="form" data-form="hwCheck" data-sid="${esc(id)}">
+          <div class="field"><label for="hwf-t">Коментар для учня</label><textarea class="input" id="hwf-t" name="text" rows="3" maxlength="1500">${esc(fb?.text || "")}</textarea></div>
+          <div class="row" style="gap:10px;align-items:flex-end"><div class="field" style="max-width:140px"><label for="hwf-m">Оцінка (необов'язково)</label><input class="input" id="hwf-m" name="mark" maxlength="10" value="${esc(fb?.mark || "")}" placeholder="12 / A / ✓"></div>
+          <button class="btn primary" type="submit" name="how" value="ok">✓ Перевірено</button><button class="btn" type="submit" name="how" value="redo">↺ На доопрацювання</button><button class="btn ghost" type="button" data-act="hwFbEdit" data-arg="">Скасувати</button></div></form>`
+        : `<div class="row"><button class="btn sm" data-act="hwFbEdit" data-arg="${esc(id)}">${fb ? "Змінити перевірку" : sub?.at ? "Перевірити" : "Написати коментар"}</button></div>`}
+    </div>`; }).join("");
+  return `<div class="stack">
+    <div class="crumb"><button class="link" data-act="hwBack">← Домашні завдання</button><span>/</span><span>${esc(h.title)}</span></div>
+    <section class="panel stack" style="gap:10px"><div class="spread"><div><div class="eyebrow">${esc(hwTargetsLabel(h))}</div><h2>${esc(h.title)}</h2>
+      <span class="small muted">задано ${fmtDate(h.date)} · до ${hwDueTxt(h)} · ${h.answer === "check" ? "достатньо позначити виконаним" : "письмова відповідь"}</span></div>
+      <div class="row"><button class="btn sm" data-act="hwEditT" data-arg="${esc(h.id)}">Редагувати</button><button class="btn sm danger" data-act="hwDel" data-arg="${esc(h.id)}">Видалити</button></div></div>
+      ${h.text ? `<div class="hwtext">${hwText(h.text)}</div>` : ""}${hwExtras(h, false)}</section>
+    <div class="sh"><h3>Учні</h3><span class="small muted">здали ${s.sent + s.chk} з ${s.n} · перевірено ${s.chk}</span></div>
+    ${t.length ? `<div class="stack" style="gap:10px">${rows}</div>` : emptyBox("学", "Ще ніхто не зареєструвався", "Учні з'являться тут, щойно увійдуть на сайт із кодом своєї групи.")}
+  </div>`;
+}
+function hwEditView(e){
+  const cls = hwMyClasses(), groups = cls.filter(c => c.kind !== "individual"), solos = cls.filter(c => c.kind === "individual");
+  const lv = [...new Set(cls.filter(c => e.classIds.includes(c.id)).map(c => c.course || "HSK1"))];
+  const lessons = lessonsSorted().filter(l => !l.hidden && (!lv.length || lv.some(x => lvIdx(l.hsk) <= lvIdx(x))));
+  const gram = grammarSorted().filter(g => !g.hidden && (!lv.length || lv.some(x => lvIdx(g.hsk) <= lvIdx(x))));
+  const chk = c => `<label class="hwchk"><input type="checkbox" name="cls" value="${esc(c.id)}" ${e.classIds.includes(c.id) ? "checked" : ""} data-chg="hwcls"> ${esc(c.name)} <span class="small muted">${esc(lvName(c.course || "HSK1"))}</span></label>`;
+  const studPick = groups.filter(c => !e.classIds.includes(c.id)).map(c => { const ss = Object.entries(S.students).filter(([, st]) => st.classId === c.id); return ss.length ? `<div class="small muted" style="margin-top:6px">${esc(c.name)}:</div>${ss.map(([id, st]) => `<label class="hwchk"><input type="checkbox" name="sid" value="${esc(id)}" ${e.sids.includes(id) ? "checked" : ""}> ${esc(dispName(st))}</label>`).join("")}` : ""; }).join("");
+  return `<div class="stack" style="max-width:820px">
+    <div class="crumb"><button class="link" data-act="hwCancel">← Домашні завдання</button><span>/</span><span>${e.id ? "Редагування ДЗ" : "Нове ДЗ"}</span></div>
+    <form class="panel form" data-form="hwSave">
+      <div class="field"><label for="hw-title">Назва</label><input class="input" id="hw-title" name="title" required maxlength="120" value="${esc(e.title)}" placeholder="ДЗ до уроку 5: 在 + місце"></div>
+      <fieldset class="field hwset"><legend>Кому</legend>
+        ${groups.length ? `<div class="small muted">Групи</div><div class="hwchks">${groups.map(chk).join("")}</div>` : ""}
+        ${solos.length ? `<div class="small muted" style="margin-top:8px">Індивідуальні учні</div><div class="hwchks">${solos.map(chk).join("")}</div>` : ""}
+        ${studPick ? `<details style="margin-top:8px" ${e.sids.length ? "open" : ""}><summary class="small">Або лише окремим учням групи</summary><div class="hwchks">${studPick}</div></details>` : ""}
+      </fieldset>
+      <div class="grid2"><div class="field"><label for="hw-date">Задано</label><input class="input" id="hw-date" name="date" type="date" value="${esc(e.date)}"></div>
+        <div class="field"><label for="hw-due">Здати до</label><input class="input" id="hw-due" name="due" type="date" value="${esc(e.due || "")}"></div></div>
+      <div class="field"><label for="hw-text">Завдання</label><textarea class="input" id="hw-text" name="text" rows="6" maxlength="4000" placeholder="Що зробити. Наприклад: вивчити слова уроку 5, скласти 5 речень з 在, прочитати текст уголос.">${esc(e.text)}</textarea></div>
+      <div class="field"><label for="hw-pages">Сторінки підручника (необов'язково)</label><input class="input" id="hw-pages" name="pages" maxlength="200" value="${esc(e.pages)}" placeholder="HSK 2 Standard Course, с. 34–36, вправи 2 і 4"></div>
+      <div class="field"><label for="hw-links">Посилання — кожне з нового рядка (необов'язково)</label><textarea class="input" id="hw-links" name="links" rows="3" maxlength="2000" placeholder="Відео про тони | https://youtube.com/…&#10;https://miro.com/…">${esc((e.links || []).map(l => (l.title ? l.title + " | " : "") + l.url).join("\n"))}</textarea><span class="hint">Формат: «назва | посилання» або просто посилання.</span></div>
+      ${hwTaskBuilder(e)}
+      <div class="field"><label for="hw-ans">Як здавати</label><select class="input" id="hw-ans" name="answer"><option value="text" ${e.answer !== "check" ? "selected" : ""}>Письмова відповідь (текст і/або посилання)</option><option value="check" ${e.answer === "check" ? "selected" : ""}>Достатньо позначити «Виконано»</option></select></div>
+      <label class="hwchk"><input type="checkbox" name="hidden" ${e.hidden ? "checked" : ""}> Приховати від учнів (чернетка)</label>
+      <div class="row"><button class="btn primary" type="submit">${e.id ? "Зберегти" : "Задати ДЗ"}</button><button class="btn ghost" type="button" data-act="hwCancel">Скасувати</button></div>
+    </form></div>`;
+}
+// ---- platform tasks inside a homework: cards, any exercise from «Вправи», grammar (read / topic exercises / drill)
+const HW_KINDS = {cards: "Картки (повторити слова)", ex: "Вправа з вкладки «Вправи»", gread: "Граматика: прочитати тему", gex: "Граматика: вправи теми", gdrill: "Граматика: тренування"};
+const hwGames = () => GAMES.filter(g => g.id !== "duel");
+// old homework kept one lesson + one grammar topic; they are shown as tasks too
+function hwTasks(h){
+  const t = (Array.isArray(h.tasks) ? h.tasks : []).filter(x => x && HW_KINDS[x.k]);
+  if (h.lessonId && !t.some(x => x.k === "cards" && x.src === h.lessonId)) t.unshift({id: "L", k: "cards", src: h.lessonId});
+  if (h.gramId && !t.some(x => x.g === h.gramId)) t.push({id: "G", k: "gread", g: h.gramId});
+  return t;
+}
+function hwSrcLabel(src){
+  src = String(src || "");
+  if (src === "bank") return "Банка слів"; if (src === "level") return "увесь поточний рівень";
+  if (src.startsWith("cv:")){ const d = S.cvocab[src.slice(3)]; return "Лексика з уроку: " + (d ? (d.title || "Заняття") + (d.date ? " · " + fmtDate(d.date) : "") : "заняття"); }
+  const l = S.lessons[src]; return l ? `${l.hsk} · ${l.title || l.id}` : "урок";
+}
+function hwTaskLabel(t){
+  if (t.k === "cards") return "Картки · " + hwSrcLabel(t.src);
+  if (t.k === "ex") return gameOf(t.type).name + (t.type === "mistakes" ? "" : " · " + hwSrcLabel(t.src));
+  const g = S.grammar[t.g]; return {gread: "Прочитати тему", gex: "Вправи теми", gdrill: "Тренування"}[t.k] + ": " + (g ? g.title : "тема");
+}
+const hwTaskGlyph = t => t.k === "ex" ? gameOf(t.type).glyph : t.k === "cards" ? "卡" : t.k === "gread" ? "读" : "语";
+function hwSrcWordIds(src){
+  src = String(src || ""); if (src === "bank" || src === "level") return null;
+  if (src.startsWith("cv:")) return (S.cvocab[src.slice(3)]?.words || []).map(w => w && w.id).filter(Boolean);
+  return (S.lessons[src]?.words || []).map(w => w && w.id).filter(Boolean);
+}
+// result of one task for one student — from her own progress (cards, grammar) or from the homework answer (exercises, reading)
+function hwTaskRes(h, t, sid){
+  const st = sid && sid === S.uid && S.me ? S.me : S.students[sid]; if (!st) return null;
+  const since = h.date || "";
+  if (t.k === "cards"){
+    const W = st.words || {}, ids = hwSrcWordIds(t.src);
+    if (!ids){ const n = Object.values(W).filter(w => w && w.last && w.last >= since).length; return n ? {txt: `повторено ${n} ${plural(n, "слово", "слова", "слів")}`, done: true} : null; }
+    const n = ids.filter(id => W[id]?.last >= since).length; return n ? {txt: `${n}/${ids.length} слів`, done: n >= ids.length} : null;
+  }
+  if (t.k === "gex" || t.k === "gdrill"){
+    const r = t.k === "gex" ? st.gram?.[t.g] : st.gdrill?.["T|" + t.g];
+    return r && r.last >= since && r.n ? {txt: `${r.best}/${r.n}`, done: true, perfect: r.best === r.n} : null;
+  }
+  const x = hwSub(h.id, sid)?.res?.[t.id]; if (!x) return null;
+  if (t.k === "gread") return {txt: "прочитано", done: true};
+  return {txt: x.n ? `${x.ok}/${x.n}` : "виконано", done: true, perfect: x.n && x.ok === x.n};
+}
+const hwAnyRes = (h, sid) => hwTasks(h).some(t => hwTaskRes(h, t, sid));
+function hwTasksHtml(h, student){
+  const ts = hwTasks(h); if (!ts.length) return "";
+  const sid = student ? (S.testAs ? "" : S.uid) : "";
+  return `<div class="hwrow"><span class="hwic" aria-hidden="true">练</span><div class="hwtasks">${ts.map(t => { const r = student ? hwTaskRes(h, t, sid) : null;
+    const inner = `<span class="han tg" aria-hidden="true">${hwTaskGlyph(t)}</span><span class="tl">${esc(hwTaskLabel(t))}</span>${r ? `<span class="pill ${r.perfect || (r.done && !/\//.test(r.txt)) ? "ok" : "gold"}">✓ ${esc(r.txt)}</span>` : student ? `<span class="go">▶</span>` : ""}`;
+    return student ? `<button class="hwtask" data-act="hwRun" data-arg="${esc(h.id)}|${esc(t.id)}">${inner}</button>` : `<span class="hwtask static">${inner}</span>`; }).join("")}</div></div>`;
+}
+function hwResRow(h, sid){
+  const ts = hwTasks(h); if (!ts.length) return "";
+  return `<div class="hwres">${ts.map(t => { const r = hwTaskRes(h, t, sid); return `<div class="hwresr"><span class="han tg" aria-hidden="true">${hwTaskGlyph(t)}</span><span class="tl">${esc(hwTaskLabel(t))}</span><span class="pill ${r ? (r.perfect || !/\//.test(r.txt) ? "ok" : "gold") : "soft"}">${r ? esc(r.txt) : "ще не робив(ла)"}</span></div>`; }).join("")}</div>`;
+}
+async function hwRecord(hid, tid, data){
+  if (S.testAs || !S.uid || staffUI() || !S.hw?.[hid]) return;
+  const key = hwKey(hid, S.uid), cur = hwSub(hid, S.uid) || {}, prev = cur.res?.[tid];
+  if (prev && (!data.n || (prev.n && prev.ok >= data.ok))) return;
+  const body = {...cur, hwId: hid, sid: S.uid, classId: S.me?.classId || "", name: dispName(S.me || {}), res: {...(cur.res || {}), [tid]: {...data, d: today()}}}; delete body.id;
+  try { await S.db.doc("hwsub/" + key).set(body); S.hwsub = {...(S.hwsub || {}), [key]: {...body, id: key}}; } catch(e){}
+}
+const hwReturnBar = () => { const h = S.hwRun && S.hw?.[S.hwRun.hw]; return h ? `<button class="note hwnudge" data-act="hwBackStu"><span>作</span><span>← Повернутися до ДЗ «${esc(h.title)}»</span></button>` : ""; };
+function hwTaskBuilder(e){
+  const cls = [...new Set([...e.classIds, ...e.sids.map(id => S.students[id]?.classId).filter(Boolean)])];
+  const lv = [...new Set(cls.map(id => S.classes[id]?.course || "HSK1"))];
+  const lessons = lessonsSorted().filter(l => !l.hidden && (!lv.length || lv.some(x => lvIdx(l.hsk) <= lvIdx(x))));
+  const gram = grammarSorted().filter(g => !g.hidden && (!lv.length || lv.some(x => lvIdx(g.hsk) <= lvIdx(x))));
+  const cvs = cls.flatMap(id => cvOf(id).map(d => ({d, c: S.classes[id]})));
+  const k = e.addKind || "cards";
+  const srcSel = `<div class="field"><label for="hwk-src">Слова</label><select class="input" id="hwk-src">
+      <optgroup label="Лексика з уроків">${cvs.length ? cvs.map(({d, c}) => `<option value="cv:${esc(d.id)}">${esc(c?.name || "")} · ${esc(d.title || "Заняття")}${d.date ? " · " + fmtDate(d.date) : ""}</option>`).join("") : `<option value="" disabled>${cls.length ? "у цих груп ще немає лексики з уроків" : "спершу оберіть, кому задати"}</option>`}</optgroup>
+      <optgroup label="Лексика за рівнями (уроки HSK)">${lessons.map(l => `<option value="${esc(l.id)}">${esc(l.hsk)} · ${esc(l.title || l.id)}</option>`).join("")}</optgroup>
+      <optgroup label="Інше"><option value="level">Увесь поточний рівень учня</option><option value="bank">Банка слів учня</option></optgroup></select></div>`;
+  const add = k === "cards" ? srcSel
+    : k === "ex" ? `<div class="field"><label for="hwk-type">Вправа</label><select class="input" id="hwk-type">${hwGames().map(g => `<option value="${g.id}">${g.glyph} ${esc(g.name)}</option>`).join("")}</select></div>${srcSel}`
+    : `<div class="field"><label for="hwk-g">Тема граматики</label><select class="input" id="hwk-g">${gram.map(g => `<option value="${esc(g.id)}">${esc(g.hsk)} · ${esc(g.title)}</option>`).join("")}</select></div>`;
+  return `<fieldset class="field hwset"><legend>Завдання на платформі (необов'язково)</legend>
+    <span class="hint">Учень відкриває кожне одним натиском, а ви бачите результат: скільки слів повторено, скільки правильних відповідей.</span>
+    ${e.tasks.length ? `<div class="hwtasks" style="margin:8px 0">${e.tasks.map((t, i) => `<span class="hwtask static"><span class="han tg" aria-hidden="true">${hwTaskGlyph(t)}</span><span class="tl">${esc(hwTaskLabel(t))}</span><button class="link small" type="button" data-act="hwTaskDel" data-arg="${i}" aria-label="Прибрати">✕</button></span>`).join("")}</div>` : ""}
+    <div class="hwadd"><div class="field"><label for="hwk-kind">Що додати</label><select class="input" id="hwk-kind" data-chg="hwkind">${Object.entries(HW_KINDS).map(([v, n]) => `<option value="${v}" ${v === k ? "selected" : ""}>${n}</option>`).join("")}</select></div>
+      ${add}<button class="btn" type="button" data-act="hwTaskAdd">+ Додати</button></div>
+  </fieldset>`;
+}
+function hwRead(f){
+  const fd = new FormData(f), e = S.hwEdit || {};
+  const links = String(fd.get("links") || "").split("\n").map(x => x.trim()).filter(Boolean).slice(0, 10).map(x => { const k = x.lastIndexOf("|"); const title = k > 0 ? x.slice(0, k).trim().slice(0, 80) : "", url = hwSafeUrl(k > 0 ? x.slice(k + 1) : x); return url ? {title, url} : null; }).filter(Boolean);
+  return {...e, title: String(fd.get("title") || "").trim().slice(0, 120), classIds: fd.getAll("cls").map(String), sids: fd.getAll("sid").map(String), date: fd.get("date") || today(), due: fd.get("due") || "",
+    text: String(fd.get("text") || "").trim().slice(0, 4000), pages: String(fd.get("pages") || "").trim().slice(0, 200), links, lessonId: "", gramId: "", tasks: (e.tasks || []).slice(), answer: fd.get("answer") === "check" ? "check" : "text", hidden: fd.get("hidden") === "on"};
 }
 
 // ---------- sounds (generated in the browser with Web Audio — no files)
@@ -3888,6 +4157,7 @@ function exRecord(wid, ok){
 }
 function exFinish(){
   const e = S.ex; e.finished = true; clearInterval(S.exTimer);
+  if (S.hwRun?.k === "ex" && S.hwRun.type === e.type && (S.hwRun.type === "mistakes" || S.hwRun.src === e.src)) hwRecord(S.hwRun.hw, S.hwRun.tid, {ok: e.ok || 0, n: e.total || 0});
   const ai = gameOf(e.type).ai;
   if (!currentCtx().preview && e.type !== "duel" && !ai){
     const me = S.me; me.exDone = (me.exDone || 0) + 1;
@@ -4289,7 +4559,7 @@ const ACT = {
   pomoToggle(){ const p = pomoLoad(); if (p.run){ p.left = pomoLeft(); p.run = false; } else { p.end = Date.now() + (p.left || pomoLen(p.phase) * 60) * 1000; p.run = true; audio(); } pomoSave(); const el = document.getElementById("pomo"); if (el) el.outerHTML = pomoHtml(); pomoTick(); },
   pomoReset(){ const p = pomoLoad(); p.run = false; p.left = pomoLen(p.phase) * 60; p.end = 0; pomoSave(); const el = document.getElementById("pomo"); if (el) el.outerHTML = pomoHtml(); pomoTick(); },
   pomoSkip(){ pomoLoad(); pomoNext(false); const el = document.getElementById("pomo"); if (el) el.outerHTML = pomoHtml(); pomoTick(); },
-  tab(t){ S.gram = null; S.pedit = null; S.medit = null; S.view = {...S.view, tab: t}; render(); },
+  tab(t){ if (t === "hw") S.hwRun = null; S.gram = null; S.pedit = null; S.medit = null; S.view = {...S.view, tab: t}; render(); },
   peOpen(sid){ peOpen(sid); S.view = {...S.view, tab: "prog", stu: sid}; render(); window.scrollTo(0, 0); },
   peClose(){ S.pedit = null; render(); },
   peDel(i){ S.pedit.skills.splice(Number(i), 1); render(); },
@@ -4446,6 +4716,45 @@ const ACT = {
     if (me.bankOwn.length >= 300){ toast("У банці вже 300 власних слів"); return; }
     me.bankOwn.push({id: rid("own"), h: w.h, p: w.p, uk: w.uk, ex: w.ex, src: "dict"}); me.bankAdded = (me.bankAdded || 0) + 1; saveMe(); toast("Додано до банки слів"); render();
   },
+  hwRun(arg){
+    const [hid, tid] = String(arg).split("|"), h = S.hw?.[hid], t = h && hwTasks(h).find(x => x.id === tid); if (!t) return;
+    S.hwRun = {hw: hid, tid, k: t.k, type: t.type, src: t.src}; S.gram = null; S.gdrill = null;
+    if (t.k === "cards"){ S.mode = "vocab"; S.view = {tab: "cards"}; startDeck(t.src === "level" ? "all" : t.src); if (!S.cards?.queue?.length) toast("У цьому наборі поки немає слів"); render(); window.scrollTo(0, 0); }
+    else if (t.k === "ex"){ S.mode = "vocab"; S.view = {tab: "ex"}; const ctx = currentCtx(); S.ex = {key: ctx.key, src: t.src || "level", running: false}; startEx(t.type); render(); window.scrollTo(0, 0); }
+    else { S.mode = "grammar"; S.view = {tab: "dash"};
+      if (t.k === "gdrill"){ S.gmode = "drill"; dStart("T|" + t.g); }
+      else { openGram(t.g); if (t.k === "gread") hwRecord(hid, tid, {read: 1}); if (t.k === "gex") setTimeout(() => document.querySelector(".gex")?.scrollIntoView({behavior: "smooth", block: "start"}), 120); } }
+  },
+  hwBackStu(){ const id = S.hwRun?.hw; S.hwRun = null; S.mode = "vocab"; S.gram = null; S.gdrill = null; S.cards = null; if (S.ex) S.ex.running = false; clearInterval(S.exTimer); S.view = {tab: "hw"}; S.hwOpen = id || null; render(); setTimeout(() => document.getElementById("hw-" + id)?.scrollIntoView({block: "start"}), 60); },
+  hwTaskAdd(){
+    const f = document.querySelector('[data-form="hwSave"]'); if (!f || !S.hwEdit) return; S.hwEdit = hwRead(f);
+    const k = document.getElementById("hwk-kind")?.value || "cards", v = id => document.getElementById(id)?.value || "";
+    const t = {id: rid("t"), k};
+    if (k === "cards" || k === "ex"){ t.src = v("hwk-src"); if (!t.src){ toast("Оберіть слова"); return; } }
+    if (k === "ex"){ t.type = v("hwk-type"); if (!t.type) return; }
+    if (k.startsWith("g")){ t.g = v("hwk-g"); if (!t.g){ toast("Оберіть тему"); return; } }
+    if (S.hwEdit.tasks.some(x => x.k === t.k && x.src === t.src && x.type === t.type && x.g === t.g)){ toast("Це завдання вже додано"); return; }
+    if (S.hwEdit.tasks.length >= 15){ toast("Не більше 15 завдань в одному ДЗ"); return; }
+    S.hwEdit.tasks.push(t); S.hwEdit.addKind = k; render();
+  },
+  hwTaskDel(i){ const f = document.querySelector('[data-form="hwSave"]'); if (f && S.hwEdit) S.hwEdit = hwRead(f); S.hwEdit?.tasks.splice(Number(i), 1); render(); },
+  hwToggle(id){ S.hwOpen = S.hwOpen === id ? null : id; render(); },
+  hwGram(id){ S.mode = "grammar"; openGram(id); },
+  hwNew(cid){ const tid = cid ? S.classes[cid]?.teacherId : staffTid(); S.view = {name: "hw", tid: S.role === "admin" ? tid || S.view.tid : undefined}; S.hwSel = null;
+    S.hwEdit = {id: null, title: "", classIds: cid ? [cid] : [], sids: [], date: today(), due: addDays(today(), 7), text: "", pages: "", links: [], lessonId: "", gramId: "", tasks: [], addKind: "cards", answer: "text", hidden: false}; render(); window.scrollTo(0, 0); },
+  hwOpenT(id){ const h = S.hw?.[id]; if (!h) return; if (S.view.name !== "hw") S.view = {name: "hw", tid: S.role === "admin" ? (h.teacherId || S.view.tid) : undefined}; S.hwSel = id; S.hwEdit = null; S.hwFbEdit = null; render(); window.scrollTo(0, 0); },
+  hwBack(){ S.hwSel = null; S.hwEdit = null; S.hwFbEdit = null; render(); },
+  hwEditT(id){ const h = S.hw?.[id]; if (!h) return; S.hwEdit = {...h, classIds: [...(h.classIds || [])], sids: [...(h.sids || [])], links: [...(h.links || [])], tasks: hwTasks(h).map(t => ({...t})), lessonId: "", gramId: "", addKind: "cards"}; render(); window.scrollTo(0, 0); },
+  hwCancel(){ S.hwEdit = null; render(); },
+  hwFbEdit(sid){ S.hwFbEdit = sid || null; render(); setTimeout(() => document.getElementById("hwf-t")?.focus(), 30); },
+  async hwDel(id){
+    if (S.hwDelAsk !== id){ S.hwDelAsk = id; toast("Натисніть «Видалити» ще раз, щоб видалити це ДЗ разом із відповідями"); setTimeout(() => { if (S.hwDelAsk === id) S.hwDelAsk = null; }, 6000); return; }
+    S.hwDelAsk = null;
+    try {
+      for (const col of ["hwsub", "hwfb"]) for (const d of Object.values(S[col] || {})) if (d.hwId === id) await S.db.doc(col + "/" + d.id).delete().catch(() => {});
+      await S.db.doc("homework/" + id).delete(); S.hwSel = null; toast("ДЗ видалено"); render();
+    } catch(e){ toast("Не вдалося видалити"); }
+  },
   tachNext(){ S.modal = null; if ((S.tachQueue || []).length) tShowNext(); else { renderModal(); render(); } },
   tachAll(){ S.modal = null; S.tachQueue = []; renderModal(); S.gram = null; S.view = {name: "awards"}; render(); window.scrollTo(0, 0); },
   tawPick(id){ S.view = {name: "awards", tid: id}; render(); },
@@ -4582,6 +4891,31 @@ document.addEventListener("keydown", e => {
   if ((e.key === "Enter" || e.key === " ") && e.target.matches?.(".flash")){ e.preventDefault(); ACT.flip(); }
 });
 Object.assign(FORM, {
+  async hwSave(f){
+    const e = hwRead(f); if (!e.title){ toast("Вкажіть назву"); return; }
+    if (!e.classIds.length && !e.sids.length){ toast("Оберіть, кому задати ДЗ"); return; }
+    if (e.due && e.due < e.date){ toast("Термін здачі раніше за дату завдання"); return; }
+    const id = e.id || rid("hw-"), old = S.hw?.[id];
+    const tid = staffTid() || S.classes[e.classIds[0]]?.teacherId || S.classes[S.students[e.sids[0]]?.classId]?.teacherId || "";
+    const body = {title: e.title, classIds: e.classIds, sids: e.sids, date: e.date, due: e.due, text: e.text, pages: e.pages, links: e.links, lessonId: "", gramId: "", tasks: (e.tasks || []).map(t => ({id: String(t.id), k: t.k, ...(t.src ? {src: String(t.src)} : {}), ...(t.type ? {type: String(t.type)} : {}), ...(t.g ? {g: String(t.g)} : {})})), answer: e.answer, hidden: e.hidden,
+      teacherId: old?.teacherId || tid, createdBy: old?.createdBy || S.uid || "", createdAt: old?.createdAt || Date.now(), updatedAt: Date.now()};
+    if (await dbSet("homework/" + id, body, e.id ? "Збережено" : "ДЗ задано")){ S.hw = {...(S.hw || {}), [id]: {...body, id}}; S.hwEdit = null; S.hwSel = id; render(); window.scrollTo(0, 0); }
+  },
+  async hwSubmit(f){
+    const id = f.dataset.id, h = S.hw?.[id]; if (!h) return;
+    if (S.testAs || !S.uid){ toast("У режимі студента відповіді не зберігаються"); return; }
+    const fd = new FormData(f), text = String(fd.get("text") || "").trim().slice(0, HW_MAX), raw = String(fd.get("link") || "").trim(), link = hwSafeUrl(raw);
+    if (raw && !link){ toast("Посилання має починатися з https://"); return; }
+    if (h.answer !== "check" && !text && !link && !hwAnyRes(h, S.uid)){ toast(hwTasks(h).length ? "Виконайте завдання на платформі або напишіть відповідь" : "Напишіть відповідь або додайте посилання"); return; }
+    const body = {...(hwSub(id, S.uid) || {}), hwId: id, sid: S.uid, classId: S.me?.classId || "", name: dispName(S.me || {}), text, link, at: Date.now(), date: today()}; delete body.id;
+    if (await dbSet("hwsub/" + hwKey(id, S.uid), body, "Відповідь надіслано викладачу")){ S.hwsub = {...(S.hwsub || {}), [hwKey(id, S.uid)]: {...body, id: hwKey(id, S.uid)}}; S.hwOpen = null; render(); }
+  },
+  async hwCheck(f, btn){
+    const h = S.hw?.[S.hwSel], sid = f.dataset.sid; if (!h || !sid) return;
+    const fd = new FormData(f), how = btn?.value === "redo" ? "redo" : "ok";
+    const body = {hwId: h.id, sid, text: String(fd.get("text") || "").trim().slice(0, 1500), mark: String(fd.get("mark") || "").trim().slice(0, 10), checked: how === "ok", redo: how === "redo", at: Date.now(), by: S.uid || ""};
+    if (await dbSet("hwfb/" + hwKey(h.id, sid), body, how === "ok" ? "Перевірено" : "Повернуто на доопрацювання")){ S.hwfb = {...(S.hwfb || {}), [hwKey(h.id, sid)]: {...body, id: hwKey(h.id, sid)}}; S.hwFbEdit = null; render(); }
+  },
   async tawGive(f){
     if (S.role !== "admin") return;
     const tid = S.view.tid || teachersSorted()[0]?.id, t = S.teachers[tid]; if (!t) return;
@@ -4592,7 +4926,7 @@ Object.assign(FORM, {
     catch(e){ toast("Не вдалося зберегти: " + (e.message || e)); }
   }
 });
-document.addEventListener("submit", e => { const f = e.target; const fn = FORM[f.dataset.form]; if (fn){ e.preventDefault(); fn(f); } });
+document.addEventListener("submit", e => { const f = e.target; const fn = FORM[f.dataset.form]; if (fn){ e.preventDefault(); fn(f, e.submitter); } });
 function gedInput(el){
   const e = S.gedit; if (!e) return;
   const k = el.dataset.gf;
@@ -4642,6 +4976,8 @@ document.addEventListener("change", async e => {
   else if (c === "pomopreset"){ const p = pomoLoad(); p.preset = el.value; p.run = false; p.left = pomoLen(p.phase) * 60; p.end = 0; pomoSave(); const w = document.getElementById("pomo"); if (w) w.outerHTML = pomoHtml(); pomoTick(); }
   else if (c === "labcls"){ const prev = S.ex?.src || "level"; S.exlab = {cls: el.value}; S.ex = {key: currentCtx().key, src: srcGroup(prev) === "cv" ? "cv" : prev, running: false}; render(); }
   else if (c === "exsrc"){ const ctx = currentCtx(); S.ex = {key: ctx.key, src: el.value, running: false}; }
+  else if (c === "hwkind"){ const f = el.closest("form"); if (f && S.hwEdit){ S.hwEdit = hwRead(f); S.hwEdit.addKind = el.value; render(); } }
+  else if (c === "hwcls"){ const f = el.closest("form"); if (f && S.hwEdit){ S.hwEdit = hwRead(f); render(); } }
   else if (c === "rankscope"){ S.rank.scope = el.value; render(); }
   else if (c === "rankteacher"){ S.rank.tid = el.value; S.rank.scope = "all"; render(); }
   else if (c === "photo" && el.files && el.files[0]) aiPhoto(el.files[0]);
