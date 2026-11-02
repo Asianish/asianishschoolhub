@@ -1193,6 +1193,8 @@ async function boot(){
   // Homework: the database rules decide what each person receives (a student gets only tasks for her and her own answers).
   [["homework", "hw"], ["hwsub", "hwsub"], ["hwfb", "hwfb"]].forEach(([col, key]) => db.collection(col).onSnapshot(q => {
     S[key] = {}; q.docs.forEach(d => S[key][d.id] = {...d.data(), id: d.id}); S.hwMissing = false;
+    S.hwGot = {...(S.hwGot || {}), [key]: 1};
+    if (S.hwGot.hw && S.hwGot.hwsub && S.hwGot.hwfb && S.me && !staffUI() && S.store === "remote") setTimeout(() => { if (checkAch()) saveMe(); }, 600);
     if (S.phase === "ready" && !document.activeElement?.closest?.("form.hwform,[data-form=hwSave],[data-form=hwCheck]")) render();
   }, e => { fail(e); S.hwMissing = true; }));
   // Skills progress: staff read every student's doc; a student can read only her own (database rules enforce this).
@@ -2567,6 +2569,7 @@ const ACH_CATS = [
   {id: "ex", han: "练", name: "Вправи", metric: "exDone", unit: "вправ"},
   {id: "perfect", han: "玉", name: "Без помилок", metric: "perfect", unit: "вправ без помилок"},
   {id: "goal", han: "日", name: "Денна норма", metric: "goalDays", unit: "днів із нормою"},
+  {id: "hw", han: "作", name: "Домашні завдання", metric: "", unit: ""},
   {id: "points", han: "钱", name: "Бали", metric: "points", unit: "балів"},
   {id: "bank", han: "罐", name: "Банка слів", metric: "", unit: ""},
   {id: "special", han: "奇", name: "Особливі", metric: "", unit: ""}
@@ -2664,6 +2667,26 @@ function buildAch(){
     {id: "bank-add-25", cat: "bank", metric: "bankAdded", need: 25, han: "集", zh: "收藏家", name: "Колекціонер", desc: "Додайте 25 слів до банки", tier: "silver"},
     {id: "bank-learn-10", cat: "bank", metric: "bankLearned", need: 10, han: "收", zh: "丰收", name: "Урожай", desc: "Позначте «Вивчив» 10 слів із банки", tier: "silver"},
     {id: "bank-learn-50", cat: "bank", metric: "bankLearned", need: 50, han: "满", zh: "满满", name: "Повна скарбничка", desc: "Позначте «Вивчив» 50 слів із банки", tier: "gold"},
+    // homework: counted only from tasks the teacher has marked «Перевірено» (only teachers can do that)
+    {id: "hw-chk-1", cat: "hw", metric: "hwChecked", need: 1, han: "作", zh: "第一份作业", name: "Перше ДЗ", desc: "Викладач перевірив ваше перше домашнє завдання", tier: "bronze"},
+    {id: "hw-chk-5", cat: "hw", metric: "hwChecked", need: 5, han: "本", zh: "作业本", name: "Зошит", desc: "5 перевірених домашніх завдань", tier: "bronze"},
+    {id: "hw-chk-10", cat: "hw", metric: "hwChecked", need: 10, han: "勤", zh: "勤学", name: "Старанний учень", desc: "10 перевірених домашніх завдань", tier: "silver"},
+    {id: "hw-chk-25", cat: "hw", metric: "hwChecked", need: 25, han: "砚", zh: "笔墨纸砚", name: "Чотири скарби кабінету", desc: "25 перевірених домашніх завдань", tier: "gold"},
+    {id: "hw-chk-50", cat: "hw", metric: "hwChecked", need: 50, han: "榜", zh: "金榜题名", name: "Ім'я на золотій дошці", desc: "50 перевірених домашніх завдань", tier: "jade"},
+    {id: "hw-on-3", cat: "hw", metric: "hwOnTime", need: 3, han: "时", zh: "准时", name: "Вчасно", desc: "3 ДЗ здано в термін і перевірено", tier: "bronze"},
+    {id: "hw-on-10", cat: "hw", metric: "hwOnTime", need: 10, han: "钟", zh: "守时", name: "Пунктуальність", desc: "10 ДЗ здано в термін", tier: "silver"},
+    {id: "hw-on-30", cat: "hw", metric: "hwOnTime", need: 30, han: "信", zh: "言而有信", name: "Слово тримаю", desc: "30 ДЗ здано в термін", tier: "gold"},
+    {id: "hw-run-5", cat: "hw", metric: "hwRun", need: 5, han: "雨", zh: "风雨无阻", name: "Ні дощ, ні вітер", desc: "5 ДЗ поспіль вчасно, без жодного пропуску", tier: "silver"},
+    {id: "hw-run-10", cat: "hw", metric: "hwRun", need: 10, han: "滴", zh: "滴水穿石", name: "Крапля точить камінь", desc: "10 ДЗ поспіль вчасно", tier: "gold"},
+    {id: "hw-run-20", cat: "hw", metric: "hwRun", need: 20, han: "铁", zh: "铁杵成针", name: "Залізний стрижень — у голку", desc: "20 ДЗ поспіль вчасно", tier: "jade"},
+    {id: "hw-early-5", cat: "hw", metric: "hwEarly", need: 5, han: "早", zh: "未雨绸缪", name: "Завчасно", desc: "5 ДЗ здано раніше терміну", tier: "silver"},
+    {id: "hw-clean-5", cat: "hw", metric: "hwClean", need: 5, han: "一", zh: "一次过", name: "З першого разу", desc: "5 ДЗ прийнято без доопрацювання", tier: "silver"},
+    {id: "hw-clean-20", cat: "hw", metric: "hwClean", need: 20, han: "精", zh: "精益求精", name: "Бездоганна робота", desc: "20 ДЗ прийнято без доопрацювання", tier: "gold"},
+    {id: "hw-fix-1", cat: "hw", metric: "hwFixed", need: 1, han: "改", zh: "知错能改", name: "Робота над помилками", desc: "Доопрацюйте ДЗ після коментаря викладача", tier: "bronze"},
+    {id: "hw-tasks-1", cat: "hw", metric: "hwTasks", need: 1, han: "台", zh: "全部完成", name: "Усе на платформі", desc: "Виконайте всі завдання на платформі в одному ДЗ", tier: "bronze"},
+    {id: "hw-tasks-10", cat: "hw", metric: "hwTasks", need: 10, han: "练", zh: "勤学苦练", name: "Тренування без пропусків", desc: "10 ДЗ, де виконано всі завдання на платформі", tier: "silver"},
+    {id: "hw-perf-1", cat: "hw", metric: "hwPerfect", need: 1, han: "满", zh: "满分", name: "Максимальний бал", desc: "ДЗ з 2+ завданнями на платформі — усі без помилок", tier: "silver"},
+    {id: "hw-perf-10", cat: "hw", metric: "hwPerfect", need: 10, han: "冠", zh: "全优", name: "Круглий відмінник", desc: "10 таких ДЗ без жодної помилки", tier: "jade"},
     {id: "sp-owl", cat: "special", metric: "f:owl", need: 1, han: "夜", zh: "夜猫子", name: "Нічна сова", desc: "Вчіться після 23:00", tier: "bronze"},
     {id: "sp-bird", cat: "special", metric: "f:bird", need: 1, han: "早", zh: "早起的鸟", name: "Рання пташка", desc: "Вчіться до 7:00 ранку", tier: "bronze"},
     {id: "sp-weekend", cat: "special", metric: "f:weekend", need: 1, han: "末", zh: "周末", name: "Вихідний з китайською", desc: "Вчіться в суботу чи неділю", tier: "bronze"},
@@ -2681,6 +2704,7 @@ function achValues(me){
     perfect: me.perfectN || 0, goalDays: Object.values(me.log || {}).filter(x => (x.a || 0) >= DAILY_GOAL).length,
     points: me.points || 0, bankAdded: me.bankAdded || 0, bankLearned: me.bankLearned || 0
   };
+  if (me === S.me) Object.assign(v, hwAchValues());
   for (const h of HSK.slice(0, 6)){
     const ws = wordsOf(lessonsSorted().filter(l => l.hsk === h && !l.hidden));
     const m = ws.filter(w => (me.words?.[w.id]?.s || 0) >= MASTER).length;
@@ -3206,7 +3230,7 @@ function hwTaskRes(h, t, sid){
     return r && r.last >= since && r.n ? {txt: `${r.best}/${r.n}`, done: true, perfect: r.best === r.n} : null;
   }
   const x = hwSub(h.id, sid)?.res?.[t.id]; if (!x) return null;
-  if (t.k === "gread") return {txt: "прочитано", done: true};
+  if (t.k === "gread") return {txt: "прочитано", done: true, perfect: true};
   return {txt: x.n ? `${x.ok}/${x.n}` : "виконано", done: true, perfect: x.n && x.ok === x.n};
 }
 const hwAnyRes = (h, sid) => hwTasks(h).some(t => hwTaskRes(h, t, sid));
@@ -3227,6 +3251,25 @@ async function hwRecord(hid, tid, data){
   if (prev && (!data.n || (prev.n && prev.ok >= data.ok))) return;
   const body = {...cur, hwId: hid, sid: S.uid, classId: S.me?.classId || "", name: dispName(S.me || {}), res: {...(cur.res || {}), [tid]: {...data, d: today()}}}; delete body.id;
   try { await S.db.doc("hwsub/" + key).set(body); S.hwsub = {...(S.hwsub || {}), [key]: {...body, id: key}}; } catch(e){}
+}
+// homework award values for the signed-in student (her tasks, answers and the teacher's checks)
+function hwAchValues(){
+  const v = {hwChecked: 0, hwOnTime: 0, hwRun: 0, hwEarly: 0, hwClean: 0, hwFixed: 0, hwTasks: 0, hwPerfect: 0};
+  if (!S.uid || staffUI() || S.testAs || !S.hw) return v;
+  const td = today(), mine = hwAll().filter(h => hwForMe(h)).sort((a, b) => String(a.due || a.date).localeCompare(String(b.due || b.date)));
+  let run = 0;
+  for (const h of mine){
+    const f = hwFb(h.id, S.uid), sb = hwSub(h.id, S.uid);
+    if (hwState(h, S.uid) !== "checked"){ if (h.due && h.due < td) run = 0; continue; }
+    v.hwChecked++;
+    const onTime = !h.due || (sb?.date && sb.date <= h.due);
+    if (onTime){ v.hwOnTime++; run++; v.hwRun = Math.max(v.hwRun, run); } else run = 0;
+    if (h.due && sb?.date && sb.date < h.due) v.hwEarly++;
+    if (f?.redos) v.hwFixed++; else v.hwClean++;
+    const ts = hwTasks(h);
+    if (ts.length){ const rs = ts.map(t => hwTaskRes(h, t, S.uid)); if (rs.every(r => r && r.done)){ v.hwTasks++; if (ts.length >= 2 && rs.every(r => r.perfect)) v.hwPerfect++; } }
+  }
+  return v;
 }
 const hwReturnBar = () => { const h = S.hwRun && S.hw?.[S.hwRun.hw]; return h ? `<button class="note hwnudge" data-act="hwBackStu"><span>作</span><span>← Повернутися до ДЗ «${esc(h.title)}»</span></button>` : ""; };
 function hwTaskBuilder(e){
@@ -4936,7 +4979,8 @@ Object.assign(FORM, {
   async hwCheck(f, btn){
     const h = S.hw?.[S.hwSel], sid = f.dataset.sid; if (!h || !sid) return;
     const fd = new FormData(f), how = btn?.value === "redo" ? "redo" : "ok";
-    const body = {hwId: h.id, sid, text: String(fd.get("text") || "").trim().slice(0, 1500), mark: String(fd.get("mark") || "").trim().slice(0, 10), checked: how === "ok", redo: how === "redo", at: Date.now(), by: S.uid || ""};
+    const old = hwFb(h.id, sid);
+    const body = {hwId: h.id, sid, text: String(fd.get("text") || "").trim().slice(0, 1500), mark: String(fd.get("mark") || "").trim().slice(0, 10), checked: how === "ok", redo: how === "redo", redos: (old?.redos || 0) + (how === "redo" && !old?.redo ? 1 : 0), at: Date.now(), by: S.uid || ""};
     if (await dbSet("hwfb/" + hwKey(h.id, sid), body, how === "ok" ? "Перевірено" : "Повернуто на доопрацювання")){ S.hwfb = {...(S.hwfb || {}), [hwKey(h.id, sid)]: {...body, id: hwKey(h.id, sid)}}; S.hwFbEdit = null; render(); }
   },
   async tawGive(f){
