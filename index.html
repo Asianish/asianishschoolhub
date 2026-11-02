@@ -909,6 +909,21 @@ body{background-color:#F8F5EF;background-image:radial-gradient(900px 600px at 0%
           done += part.length; say(`Оновлюю… ${done} з ${total}`);
         }
       }
+      // 1b) groups can name their teacher instead of an id: they go to the EXISTING teacher card with that name (no new teacher is created)
+      const tnRows = Object.values(cols.classes || {}).filter(r => r && r.teacherName && !r.teacherId);
+      if (tnRows.length){
+        const {data: trs, error: et} = await sb.from("teachers").select("id,data");
+        if (et) throw new Error("teachers: " + et.message);
+        const norm = n => String(n || "").toLowerCase().replace(/[’'ʼ`]/g, "").replace(/ё/g, "е").split(/\s+/).filter(Boolean).sort().join(" ");
+        const missing = new Set();
+        for (const r of tnRows){
+          let hits = (trs || []).filter(t => norm(t.data?.name) === norm(r.teacherName));
+          if (!hits.length){ const want = norm(r.teacherName).split(" "); const part = (trs || []).filter(t => { const have = norm(t.data?.name).split(" "); return want.every(w => have.includes(w)) || (have.length && have.every(w => want.includes(w))); }); if (part.length === 1) hits = part; }
+          const pick = hits.find(t => t.data?.uid) || hits.sort((x, y) => (x.data?.order || 0) - (y.data?.order || 0))[0];
+          if (pick){ r.teacherId = pick.id; delete r.teacherName; } else missing.add(r.teacherName);
+        }
+        if (missing.size){ say("Не знайдено картку викладача: " + [...missing].join(", ") + ". Створіть її кнопкою «+ Викладач» (ім'я точно як у файлі) і завантажте файл ще раз. Нічого не змінено.", false); e.target.value = ""; return; }
+      }
       // 2) full records (new or replaced)
       for (const c of IMPORT_ORDER){
         const rows = Object.entries(cols[c] || {}).map(([id, data]) => ({id, data}));
