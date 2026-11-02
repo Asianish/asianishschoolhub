@@ -522,6 +522,7 @@ b,strong{font-family:var(--f-ui);font-weight:600}
 button.hwtask:hover{border-color:var(--gold)}.hwtask.static{cursor:default}.hwtask .tg{font-family:var(--f-han);color:var(--gold-ink);font-size:1.15rem;flex:none}
 .hwtask .tl{flex:1;min-width:0;overflow-wrap:anywhere}.hwtask .go{color:var(--gold-ink);font-size:.8rem;flex:none}
 .hwadd{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;align-items:end;margin-top:6px}
+.hwfolder{padding:14px 18px}.hwfhead{all:unset;cursor:pointer;display:flex;align-items:center;gap:12px;width:100%;box-sizing:border-box}.hwfhead:focus-visible{outline:2px solid var(--gold);outline-offset:4px;border-radius:6px}.hwfic{font-family:var(--f-han);font-size:1.5rem;color:var(--gold-ink);flex:none}.hwfhead .chev{color:var(--muted);width:14px;text-align:center}.hwfhead>.stack{flex:1}.hwfolder .hwitem{box-shadow:none}
 .hwres{display:flex;flex-direction:column;gap:4px;border-top:1px dashed var(--line);padding-top:8px}.hwresr{display:flex;align-items:center;gap:8px;font-size:.9rem}.hwresr .tg{font-family:var(--f-han);color:var(--gold-ink);flex:none}.hwresr .tl{flex:1;min-width:0;overflow-wrap:anywhere}.hwresr .pill{flex:none}
 .hwrow{display:flex;gap:10px;align-items:flex-start}.hwic{font-family:var(--f-han);color:var(--gold-ink);font-size:1.1rem;line-height:1.6}
 .hwitem{display:flex!important;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer;width:100%;font:inherit;color:var(--fg);text-align:left}.hwitem:hover{border-color:var(--gold)}
@@ -3077,16 +3078,35 @@ function hwVisibleForStaff(classId){
   return hwAll().filter(h => classId ? (h.classIds || []).includes(classId) || hwTargets(h).some(([, st]) => st.classId === classId)
     : admin || h.createdBy === S.uid || (h.classIds || []).some(id => mineCls.has(id)) || hwTargets(h).some(([, st]) => mineCls.has(st.classId)));
 }
-function hwStats(h){ const t = hwTargets(h); let sent = 0, chk = 0; for (const [id] of t){ const s = hwState(h, id); if (s === "sent") sent++; if (s === "checked") { chk++; } } return {n: t.length, sent, chk, wait: sent}; }
+function hwStats(h, classId){ const t = hwTargets(h).filter(([, st]) => !classId || st.classId === classId); let sent = 0, chk = 0; for (const [id] of t){ const s = hwState(h, id); if (s === "sent") sent++; if (s === "checked") { chk++; } } return {n: t.length, sent, chk, wait: sent}; }
+function hwItem(h, classId){
+  const s = hwStats(h, classId);
+  return `<button class="panel hwitem" data-act="hwOpenT" data-arg="${esc(h.id)}"><span class="stack" style="gap:2px;min-width:0;text-align:left"><b>${esc(h.title)}${h.hidden ? ` <span class="pill">чернетка</span>` : ""}</b>
+    <span class="small muted">${classId && !(h.sids || []).length && (h.classIds || []).length < 2 ? "" : ((h.sids || []).length && !(h.classIds || []).length ? "лише: " : "") + esc(hwTargetsLabel(h)) + " · "}задано ${fmtDate(h.date)} · до ${hwDueTxt(h)}${hwLate(h) ? " · термін минув" : ""}</span></span>
+    <span class="row" style="gap:6px;flex:none">${s.wait ? `<span class="pill gold">чекає перевірки: ${s.wait}</span>` : ""}${s.n ? `<span class="pill soft num">здали ${s.sent + s.chk}/${s.n}</span>` : `<span class="pill soft">учні ще не увійшли</span>`}</span></button>`;
+}
+// homework of one class (group or individual student): set to the whole class or to some of its students
+const hwOfClass = (list, cid) => list.filter(h => (h.classIds || []).includes(cid) || (h.sids || []).some(id => S.students[id]?.classId === cid));
 function hwListStaff(classId){
   if (S.hwMissing) return `<div class="note"><span>⚠</span><span><b>Розділ ДЗ ще не підключено до бази.</b> Адміністраторці потрібно один раз запустити SQL для домашніх завдань у Supabase (SQL Editor → Run), а потім оновити сторінку.</span></div>`;
   const list = hwVisibleForStaff(classId);
-  return `<div class="spread"><span class="small muted">Учні відповідають текстом або посиланням — без фото.</span><button class="btn primary" data-act="hwNew" data-arg="${esc(classId || "")}">+ Нове ДЗ</button></div>
-    ${list.length ? `<div class="stack" style="gap:10px">${list.map(h => { const s = hwStats(h);
-      return `<button class="panel hwitem" data-act="hwOpenT" data-arg="${esc(h.id)}"><span class="stack" style="gap:2px;min-width:0;text-align:left"><b>${esc(h.title)}${h.hidden ? ` <span class="pill">приховано</span>` : ""}</b>
-        <span class="small muted">${esc(hwTargetsLabel(h))} · задано ${fmtDate(h.date)} · до ${hwDueTxt(h)}</span></span>
-        <span class="row" style="gap:6px;flex:none">${s.wait ? `<span class="pill gold">чекає перевірки: ${s.wait}</span>` : ""}<span class="pill soft num">здали ${s.sent + s.chk}/${s.n}</span></span></button>`; }).join("")}</div>`
-      : emptyBox("作", "Ще немає домашніх завдань", "Натисніть «+ Нове ДЗ»: оберіть групу чи учня, напишіть завдання, сторінки підручника й посилання.")}`;
+  const head = `<div class="spread"><span class="small muted">Учні відповідають текстом або посиланням — без фото. Кожен учень бачить лише свої ДЗ.</span><button class="btn primary" data-act="hwNew" data-arg="${esc(classId || "")}">+ Нове ДЗ</button></div>`;
+  if (!list.length) return head + emptyBox("作", "Ще немає домашніх завдань", "Натисніть «+ Нове ДЗ»: оберіть групу чи учня, напишіть завдання, сторінки підручника й посилання.");
+  if (classId) return head + `<div class="stack" style="gap:10px">${list.map(h => hwItem(h, classId)).join("")}</div>`;
+  // folders: one per group and per individual student
+  const cls = classesSorted().filter(c => hwOfClass(list, c.id).length);
+  const groups = cls.filter(c => c.kind !== "individual"), solos = cls.filter(c => c.kind === "individual");
+  const open = S.hwFolders || {};
+  const folder = c => { const items = hwOfClass(list, c.id), wait = items.reduce((a, h) => a + hwStats(h, c.id).wait, 0), isOpen = open[c.id] ?? (cls.length <= 3);
+    return `<section class="panel hwfolder"><button class="hwfhead" data-act="hwFolder" data-arg="${esc(c.id)}" aria-expanded="${isOpen}">
+        <span class="han hwfic" aria-hidden="true">${c.kind === "individual" ? "个" : "班"}</span>
+        <span class="stack" style="gap:2px;min-width:0;text-align:left"><b>${esc(c.name)}</b><span class="small muted">${esc(lvName(c.course || "HSK1"))}${c.schedule ? " · " + esc(c.schedule) : ""}</span></span>
+        <span class="row" style="gap:6px;flex:none">${wait ? `<span class="pill gold">чекає перевірки: ${wait}</span>` : ""}<span class="pill soft num">${items.length} ДЗ</span><span class="chev" aria-hidden="true">${isOpen ? "▾" : "▸"}</span></span></button>
+      ${isOpen ? `<div class="stack" style="gap:8px;margin-top:10px">${items.map(h => hwItem(h, c.id)).join("")}<button class="btn sm" data-act="hwNew" data-arg="${esc(c.id)}" style="align-self:flex-start">+ ДЗ для «${esc(c.name)}»</button></div>` : ""}</section>`; };
+  const orphan = list.filter(h => !cls.some(c => hwOfClass([h], c.id).length));
+  return head + `${groups.length ? `<div class="sh"><h3>Групи</h3><span class="small muted num">${groups.length}</span></div><div class="stack" style="gap:10px">${groups.map(folder).join("")}</div>` : ""}
+    ${solos.length ? `<div class="sh"><h3>Індивідуальні учні</h3><span class="small muted num">${solos.length}</span></div><div class="stack" style="gap:10px">${solos.map(folder).join("")}</div>` : ""}
+    ${orphan.length ? `<div class="sh"><h3>Без групи</h3></div><div class="stack" style="gap:10px">${orphan.map(h => hwItem(h, "")).join("")}</div>` : ""}`;
 }
 function hwStaffView(){
   const e = S.hwEdit; if (e) return hwEditView(e);
@@ -3177,7 +3197,9 @@ function hwTaskRes(h, t, sid){
   if (t.k === "cards"){
     const W = st.words || {}, ids = hwSrcWordIds(t.src);
     if (!ids){ const n = Object.values(W).filter(w => w && w.last && w.last >= since).length; return n ? {txt: `повторено ${n} ${plural(n, "слово", "слова", "слів")}`, done: true} : null; }
-    const n = ids.filter(id => W[id]?.last >= since).length; return n ? {txt: `${n}/${ids.length} слів`, done: n >= ids.length} : null;
+    // a word counts if it was repeated after the homework was set, or it is already learned and not yet due (the cards then don't ask for it)
+    const td = today(), n = ids.filter(id => W[id]?.last >= since).length, k = ids.filter(id => !(W[id]?.last >= since) && W[id]?.s > 0 && W[id]?.due > td).length;
+    return n ? {txt: `${n + k}/${ids.length} слів`, done: n + k >= ids.length, perfect: n + k >= ids.length} : null;
   }
   if (t.k === "gex" || t.k === "gdrill"){
     const r = t.k === "gex" ? st.gram?.[t.g] : st.gdrill?.["T|" + t.g];
@@ -4738,6 +4760,7 @@ const ACT = {
     S.hwEdit.tasks.push(t); S.hwEdit.addKind = k; render();
   },
   hwTaskDel(i){ const f = document.querySelector('[data-form="hwSave"]'); if (f && S.hwEdit) S.hwEdit = hwRead(f); S.hwEdit?.tasks.splice(Number(i), 1); render(); },
+  hwFolder(id){ S.hwFolders = S.hwFolders || {}; const cur = S.hwFolders[id] ?? (document.querySelectorAll(".hwfolder").length <= 3); S.hwFolders[id] = !cur; render(); },
   hwToggle(id){ S.hwOpen = S.hwOpen === id ? null : id; render(); },
   hwGram(id){ S.mode = "grammar"; openGram(id); },
   hwNew(cid){ const tid = cid ? S.classes[cid]?.teacherId : staffTid(); S.view = {name: "hw", tid: S.role === "admin" ? tid || S.view.tid : undefined}; S.hwSel = null;
