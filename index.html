@@ -559,6 +559,11 @@ button.hwtask:hover{border-color:var(--gold)}.hwtask.static{cursor:default}.hwta
 .txw{display:flex;flex-direction:column;gap:2px;padding:8px 10px;border:1px solid var(--line);border-radius:10px}.txw .han{font-family:var(--f-han);font-size:1.25rem}.txw .py{color:var(--gold-ink);font-size:.85rem}
 .txq{display:flex;flex-direction:column;gap:8px}.txq .opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px}
 @media (max-width:560px){.txzh{font-size:1.25rem}.txh{font-size:1.7rem}.txbody{padding:4px 12px}}
+.best{display:flex;flex-direction:column;gap:10px;border-color:var(--gold);background:linear-gradient(180deg,rgba(201,161,93,.10),transparent 60%),var(--surface)}
+.best h3{margin:2px 0 0}.bestlist{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
+.bestlist li{display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}.bestlist li b{flex:1;min-width:0;overflow-wrap:anywhere}.bestlist li .pill{flex:none}.bestlist li .num{flex:none;white-space:nowrap}.bestlist li.me{border-color:var(--gold)}
+.bmk{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;font-weight:800;font-size:.85rem;flex:none;background:var(--surface2);color:var(--muted)}
+.bmk.b1{background:linear-gradient(135deg,#F4DC9A,#C9A15D);color:#23483F}.bmk.b2{background:linear-gradient(135deg,#F1F2F0,#9AA09D);color:#2C2C2C}.bmk.b3{background:linear-gradient(135deg,#E2B48A,#A86A3E);color:#fff}
 .hwfolder{padding:14px 18px}.hwfhead{all:unset;cursor:pointer;display:flex;align-items:center;gap:12px;width:100%;box-sizing:border-box}.hwfhead:focus-visible{outline:2px solid var(--gold);outline-offset:4px;border-radius:6px}.hwfic{font-family:var(--f-han);font-size:1.5rem;color:var(--gold-ink);flex:none}.hwfhead .chev{color:var(--muted);width:14px;text-align:center}.hwfhead>.stack{flex:1}.hwfolder .hwitem{box-shadow:none}
 .hwres{display:flex;flex-direction:column;gap:4px;border-top:1px dashed var(--line);padding-top:8px}.hwresr{display:flex;align-items:center;gap:8px;font-size:.9rem}.hwresr .tg{font-family:var(--f-han);color:var(--gold-ink);flex:none}.hwresr .tl{flex:1;min-width:0;overflow-wrap:anywhere}.hwresr .pill{flex:none}
 .hwrow{display:flex;gap:10px;align-items:flex-start}.hwic{font-family:var(--f-han);color:var(--gold-ink);font-size:1.1rem;line-height:1.6}
@@ -1146,9 +1151,14 @@ function rankRow(st, p){
   for (const [k, v] of Object.entries(st.log || {})) if (k >= from){ pts += v.p || 0; m += v.m || 0; c += v.c || 0; }
   return {pts, m, c};
 }
-// Ranking: all students by default; tid narrows to one teacher's students, classId to one group.
-function rankList(p, classId, tid){
+// Leagues: students of similar level compete with each other (level = the course of their group / individual class).
+const LEAGUES = {1: {name: "HSK 1–2", lv: ["HSK1", "HSK2"]}, 2: {name: "HSK 3–4", lv: ["HSK3", "HSK4"]}, 3: {name: "HSK 5+", lv: ["HSK5", "HSK6"]}};
+const leagueOf = st => { const c = courseOf(st, classOf(st)); return lvIdx(c) >= 4 ? 3 : lvIdx(c) >= 2 ? 2 : 1; };
+const isPair = c => !!c && c.kind !== "individual" && /пара/i.test(c.name || "");
+// Ranking: all students by default; tid narrows to one teacher's students, classId to one group, lg to one league.
+function rankList(p, classId, tid, lg){
   return Object.entries(S.students)
+    .filter(([, st]) => !lg || leagueOf(st) === lg)
     .filter(([, st]) => tid == null || studentTid(st) === tid)
     .filter(([, st]) => !classId || st.classId === classId)
     .map(([id, st]) => ({id, name: dispName(st), cls: st.classId, ...rankRow(st, p), streak: streak(st)}))
@@ -2726,6 +2736,9 @@ function buildAch(){
     {id: "hw-tasks-10", cat: "hw", metric: "hwTasks", need: 10, han: "练", zh: "勤学苦练", name: "Тренування без пропусків", desc: "10 ДЗ, де виконано всі завдання на платформі", tier: "silver"},
     {id: "hw-perf-1", cat: "hw", metric: "hwPerfect", need: 1, han: "满", zh: "满分", name: "Максимальний бал", desc: "ДЗ з 2+ завданнями на платформі — усі без помилок", tier: "silver"},
     {id: "hw-perf-10", cat: "hw", metric: "hwPerfect", need: 10, han: "冠", zh: "全优", name: "Круглий відмінник", desc: "10 таких ДЗ без жодної помилки", tier: "jade"},
+    {id: "best-1", cat: "special", metric: "bestN", need: 1, han: "佳", zh: "最佳学生", name: "Найкращий учень школи", desc: "Увійдіть до 7 найкращих учнів школи з китайської за місяць", tier: "gold"},
+    {id: "best-3", cat: "special", metric: "bestN", need: 3, han: "星", zh: "三冠", name: "Тричі найкращий", desc: "Тричі серед 7 найкращих учнів школи з китайської", tier: "jade"},
+    {id: "best-top", cat: "special", metric: "bestFirst", need: 1, han: "冠", zh: "月冠军", name: "Чемпіон місяця", desc: "Посядьте 1-ше місце серед усіх учнів китайської за місяць", tier: "jade"},
     {id: "sp-owl", cat: "special", metric: "f:owl", need: 1, han: "夜", zh: "夜猫子", name: "Нічна сова", desc: "Вчіться після 23:00", tier: "bronze"},
     {id: "sp-bird", cat: "special", metric: "f:bird", need: 1, han: "早", zh: "早起的鸟", name: "Рання пташка", desc: "Вчіться до 7:00 ранку", tier: "bronze"},
     {id: "sp-weekend", cat: "special", metric: "f:weekend", need: 1, han: "末", zh: "周末", name: "Вихідний з китайською", desc: "Вчіться в суботу чи неділю", tier: "bronze"},
@@ -2743,7 +2756,7 @@ function achValues(me){
     perfect: me.perfectN || 0, goalDays: Object.values(me.log || {}).filter(x => (x.a || 0) >= DAILY_GOAL).length,
     points: me.points || 0, bankAdded: me.bankAdded || 0, bankLearned: me.bankLearned || 0
   };
-  if (me === S.me) Object.assign(v, hwAchValues());
+  if (me === S.me){ Object.assign(v, hwAchValues()); if (S.uid && !S.testAs){ const b = bestWins(S.uid); v.bestN = b.n; v.bestFirst = b.first; } }
   for (const h of HSK.slice(0, 6)){
     const ws = wordsOf(lessonsSorted().filter(l => l.hsk === h && !l.hidden));
     const m = ws.filter(w => (me.words?.[w.id]?.s || 0) >= MASTER).length;
@@ -4632,6 +4645,33 @@ function gramRecord(i, ok){
 // =====================================================================
 // RANKING
 // =====================================================================
+// ---- «Найкращий учень школи з китайської мови»: every month the 7 students with the most points earned that month
+// (all teachers, all levels, the same rules for everyone). Finished months go to the hall of fame.
+const BEST_N = 7;
+let _bestCache = null;
+function bestOfMonth(m){
+  const key = m + ":" + Object.keys(S.students).length + ":" + today();
+  _bestCache = _bestCache && _bestCache.day === today() ? _bestCache : {day: today(), v: {}};
+  if (_bestCache.v[key]) return _bestCache.v[key];
+  const out = Object.entries(S.students).map(([id, st]) => { let pts = 0; for (const [d, v] of Object.entries(st.log || {})) if (d.slice(0, 7) === m) pts += v.p || 0; return {id, name: dispName(st), pts}; })
+    .filter(x => x.pts > 0).sort((a, b) => b.pts - a.pts || a.name.localeCompare(b.name, "uk")).slice(0, BEST_N);
+  return (_bestCache.v[key] = out);
+}
+const bestWins = sid => monthList(13).slice(1).reduce((a, m) => { const i = bestOfMonth(m).findIndex(x => x.id === sid); if (i >= 0){ a.n++; if (!i) a.first++; } return a; }, {n: 0, first: 0});
+function bestHtml(teacher){
+  const cm = curMonth(), live = bestOfMonth(cm), past = monthList(7).slice(1).map(m => ({m, w: bestOfMonth(m)})).filter(x => x.w.length);
+  const sel = S.bestM && past.some(x => x.m === S.bestM) ? S.bestM : "";
+  const list = sel ? past.find(x => x.m === sel).w : live;
+  const mk = i => `<span class="bmk b${Math.min(i + 1, 4)}">${i + 1}</span>`;
+  return `<section class="panel best">
+    <div class="spread"><div><div class="eyebrow">最佳学生 · Номінація школи</div><h3>Найкращий учень школи з китайської мови</h3></div><span class="pill gold">${BEST_N} переможців щомісяця</span></div>
+    <p class="small muted">Сім учнів, які заробили найбільше балів за місяць, серед усіх учнів китайської — усіх викладачів, груп, пар і індивідуальних. Правила балів однакові для всіх рівнів. Підсумок — 1-го числа наступного місяця.</p>
+    <div class="chips"><button class="chip" aria-pressed="${!sel}" data-act="bestM" data-arg="">${monthName(cm)} · зараз</button>${past.map(x => `<button class="chip" aria-pressed="${sel === x.m}" data-act="bestM" data-arg="${x.m}">🏆 ${monthName(x.m)}</button>`).join("")}</div>
+    ${list.length ? `<ol class="bestlist">${list.map((x, i) => `<li class="${!teacher && x.id === S.uid ? "me" : ""}">${mk(i)}<b>${esc(x.name)}</b>${!teacher && x.id === S.uid ? ` <span class="pill gold">ви</span>` : ""}<span class="num muted">${x.pts} балів</span></li>`).join("")}</ol>`
+      : `<p class="small muted">У цьому місяці ще ніхто не заробив балів — станьте першим!</p>`}
+    ${!sel ? `<p class="small muted" style="margin:0">Це поточна гонка: склад може змінитися до кінця місяця.</p>` : `<p class="small muted" style="margin:0">Переможці за ${monthName(sel).toLowerCase()} отримали нагороду «Найкращий учень школи».</p>`}
+  </section>`;
+}
 function pointsRulesHtml(){
   const row = (pts, what, note) => `<li><span class="pts">${pts}</span><span><b>${what}</b>${note ? `<span class="small muted">${note}</span>` : ""}</span></li>`;
   return `<section class="stack" style="gap:14px"><div class="sh" style="margin:0"><h3>Як нараховуються бали</h3><span class="small muted">Однаково для всіх студентів</span></div>
@@ -4667,28 +4707,33 @@ function rankView(teacher, classId){
   const r = S.rank, allowGroup = teacher || S.settings.groupRanking !== false;
   let scope = r.scope || "all";
   if (teacher && classId && r.scopeInit !== classId){ r.scopeInit = classId; scope = r.scope = classId; }
-  if (!teacher) scope = allowGroup && classId && scope === "group" ? classId : "all";
+  const myCls0 = S.classes[classId], solo = !myCls0 || myCls0.kind === "individual";
+  const myLg = !teacher && S.me ? leagueOf(S.me) : null;
+  if (!teacher) scope = scope === "lg" && myLg ? "lg:" + myLg : allowGroup && classId && !solo && scope === "group" ? classId : "all";
   const admin = S.role === "admin", myT = myTeacherId();
   const myCls = admin ? classesSorted() : classesOf(myT);
-  if (teacher && scope !== "all" && !scope.startsWith("t:") && !myCls.some(c => c.id === scope)) scope = r.scope = "all";
-  const tid = scope.startsWith("t:") ? scope.slice(2) : null, cid = scope === "all" || tid != null ? "" : scope;
-  const list = rankList(r.period, cid, tid), top = list.slice(0, 10);
+  if (teacher && scope !== "all" && !scope.startsWith("t:") && !scope.startsWith("lg:") && !myCls.some(c => c.id === scope)) scope = r.scope = "all";
+  const tid = scope.startsWith("t:") ? scope.slice(2) : null, lg = scope.startsWith("lg:") ? Number(scope.slice(3)) : 0;
+  const cid = scope === "all" || tid != null || lg ? "" : scope;
+  const list = rankList(r.period, cid, tid, lg), top = list.slice(0, 10);
   const meIdx = !teacher && S.store === "remote" ? list.findIndex(x => x.id === S.uid) : -1;
   const periods = [["all","За весь час"],["month","Цей місяць"],["week","Цей тиждень"]];
   let scopeCtl = "";
   if (teacher) scopeCtl = `<select class="input" style="width:auto;min-height:38px" data-chg="rankscope" aria-label="Кого показати"><option value="all" ${scope === "all" ? "selected" : ""}>Усі студенти китайської</option>
     ${admin ? teachersSorted().map(t => `<option value="t:${esc(t.id)}" ${scope === "t:" + t.id ? "selected" : ""}>Учні: ${esc(t.name)}</option>`).join("") : myT ? `<option value="t:${esc(myT)}" ${scope === "t:" + myT ? "selected" : ""}>Мої учні</option>` : ""}
+    <optgroup label="Ліги за рівнем">${Object.entries(LEAGUES).map(([k, L]) => `<option value="lg:${k}" ${scope === "lg:" + k ? "selected" : ""}>Ліга ${L.name}</option>`).join("")}</optgroup>
     ${myCls.map(c => `<option value="${esc(c.id)}" ${scope === c.id ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select>`;
-  else if (allowGroup && classId) scopeCtl = `<div class="chips"><button class="chip" aria-pressed="${scope === "all"}" data-act="rankScope" data-arg="all">Усі студенти</button><button class="chip" aria-pressed="${scope !== "all"}" data-act="rankScope" data-arg="group">Моя група</button></div>`;
+  else scopeCtl = `<div class="chips"><button class="chip" aria-pressed="${scope === "all"}" data-act="rankScope" data-arg="all">Уся школа</button>${myLg ? `<button class="chip" aria-pressed="${lg === myLg}" data-act="rankScope" data-arg="lg">Моя ліга: ${LEAGUES[myLg].name}</button>` : ""}${allowGroup && classId && !solo ? `<button class="chip" aria-pressed="${!!cid}" data-act="rankScope" data-arg="group">${isPair(myCls0) ? "Моя пара" : "Моя група"}</button>` : ""}</div>`;
   const podium = top.slice(0, 3).map((x, i) => `<div class="pod p${i + 1}"><span class="medal">${i + 1}</span><span class="nm">${esc(x.name)}</span><span class="pts num">${x.pts}</span><span class="small muted">балів</span></div>`).join("");
   const mk = i => i === 0 ? `<span class="mk g">1</span>` : i === 1 ? `<span class="mk s">2</span>` : i === 2 ? `<span class="mk b">3</span>` : `<span class="num" style="padding-left:8px">${i + 1}</span>`;
   const row = (x, i) => `<tr class="${x.id === S.uid && !teacher ? "me" : ""}"><td>${mk(i)}</td><td><b>${esc(x.name)}</b>${x.id === S.uid && !teacher ? ` <span class="pill gold">ви</span>` : ""}</td><td class="n">${x.m}</td><td class="n">${x.c}</td><td class="n">${x.streak}</td><td class="n"><b>${x.pts}</b></td></tr>`;
   const table = top.length ? `<div class="tablewrap"><table><thead><tr><th>Місце</th><th>Учасник</th><th class="n">${r.period === "all" ? "Опановано" : "Опановано за період"}</th><th class="n">Правильні відповіді</th><th class="n">Серія днів</th><th class="n">Бали</th></tr></thead><tbody>${top.map(row).join("")}${meIdx >= 10 ? `<tr><td colspan="6" class="small muted" style="text-align:center">…</td></tr>${row(list[meIdx], meIdx)}` : ""}</tbody></table></div>` : emptyBox("榜", "За цей період ще немає результатів", "Рейтинг заповнюється після перших повторень карток і вправ.");
   const mine = teacher ? "" : S.store === "test" ? `<div class="note info"><span>🧪</span><span>Тестовий режим: вас немає в рейтингу, ви бачите справжній рейтинг студентів.</span></div>` : S.store !== "remote" ? `<div class="note"><span>📱</span><span>Ваш прогрес зберігається лише на цьому пристрої, тому вас немає в рейтингу.</span></div>`
     : meIdx >= 0 ? `<div class="note info"><span>⭐</span><span>Ваше місце: <b>${meIdx + 1}</b> з ${list.length}.</span></div>` : `<div class="note info"><span>⭐</span><span>Отримайте перші бали, щоб з'явитися в рейтингу.</span></div>`;
-  return `<p class="small muted">${cid ? `Рейтинг групи <b>${esc(S.classes[cid]?.name || "")}</b>.` : tid ? `Учні викладача <b>${esc(S.teachers[tid]?.name || "")}</b>.` : "Спільний рейтинг усіх студентів китайської мови школи Asianish."} Показуються лише ім'я або псевдонім і бали — без жодних інших даних.</p>
+  return `<p class="small muted">${lg ? `Ліга <b>${LEAGUES[lg].name}</b>: учні всіх викладачів, які вчаться на рівнях ${lg === 3 ? "HSK 5 і вище" : LEAGUES[lg].lv.map(lvName).join(" і ")}.` : cid ? `Рейтинг ${isPair(S.classes[cid]) ? "пари" : "групи"} <b>${esc(S.classes[cid]?.name || "")}</b>.` : tid ? `Учні викладача <b>${esc(S.teachers[tid]?.name || "")}</b>.` : "Спільний рейтинг усіх студентів китайської мови школи Asianish."} Показуються лише ім'я або псевдонім і бали — без жодних інших даних.</p>
     <div class="spread"><div class="chips">${periods.map(([id, n]) => `<button class="chip" aria-pressed="${r.period === id}" data-act="period" data-arg="${id}">${n}</button>`).join("")}</div>${scopeCtl}</div>
     ${mine}
+    ${scope === "all" ? bestHtml(teacher) : ""}
     ${top.length >= 3 ? `<div class="podium">${podium}</div>` : ""}
     ${table}
     ${teacher ? "" : myPointsHtml()}
@@ -4869,6 +4914,7 @@ const ACT = {
   gOrderReset(i){ S.gram.order[Number(i)] = []; render(); },
   gOrderCheck(i){ i = Number(i); const q = S.grammar[S.gram.id].ex[i]; const built = (S.gram.order[i] || []).map(k => q.words[k]).join(""); const alts = [q.a, ...(q.alt || [])].map(stripP); const ok = alts.includes(stripP(built)); S.gram.ans[i] = {ok}; gramRecord(i, ok); render(); },
   period(p){ S.rank.period = p; render(); },
+  bestM(m){ S.bestM = m || ""; render(); },
   rankScope(s){ S.rank.scope = s; render(); },
   editLesson(id){ openEditor(id || null); },
   edAdd(){ S.edit.words.push(blankWord()); render(); },
