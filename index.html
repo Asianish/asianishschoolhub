@@ -1159,6 +1159,7 @@ const isPair = c => !!c && c.kind !== "individual" && /пара/i.test(c.name ||
 // Ranking: all students by default; tid narrows to one teacher's students, classId to one group, lg to one league.
 function rankList(p, classId, tid, lg){
   return Object.entries(S.students)
+    .filter(([id]) => !isStaffId(id))
     .filter(([, st]) => !lg || leagueOf(st) === lg)
     .filter(([, st]) => tid == null || studentTid(st) === tid)
     .filter(([, st]) => !classId || st.classId === classId)
@@ -1406,7 +1407,8 @@ const classesOf = tid => classesSorted().filter(c => (c.teacherId || "") === (ti
 const orphanClasses = () => classesSorted().filter(c => !c.teacherId || !S.teachers[c.teacherId]);
 const studentTid = st => { const c = classOf(st); return c && S.teachers[c.teacherId] ? c.teacherId : ""; };
 const studentsOf = tid => Object.entries(S.students).filter(([, st]) => studentTid(st) === tid && st.classId && S.classes[st.classId]);
-const unassignedStudents = () => Object.entries(S.students).filter(([, st]) => !st.classId || !S.classes[st.classId]);
+const isStaffId = id => Object.values(S.teachers || {}).some(t => t.uid === id) || ["admin", "teacher"].includes(S.staff?.[id]?.role);
+const unassignedStudents = () => Object.entries(S.students).filter(([id, st]) => (!st.classId || !S.classes[st.classId]) && !isStaffId(id));
 // Which teacher's cabinet is on screen: admin picks one; a teacher always sees her own.
 function ctxTid(){
   if (S.role === "admin") return S.view.tid || (S.view.name === "class" ? S.classes[S.view.id]?.teacherId || "" : "");
@@ -1678,9 +1680,10 @@ function studentTable(entries, tid){
       <td class="n">${gd}</td>
       <td class="n">${s.acc == null ? "—" : s.acc + "%"}</td><td class="n">${s.exDone}</td><td class="n">${s.streak}</td>
       <td class="n">${s.points}</td><td class="n">${w.pts}</td><td class="n">${Object.keys(st.ach || {}).length}</td><td>${st.updatedAt ? fmtDate(dstr(new Date(st.updatedAt))) : "—"}</td>
-      <td><select class="input" style="min-height:34px;padding:4px 8px;width:auto" data-chg="assign" data-id="${esc(id)}" aria-label="Група студента">${opts(st.classId)}</select></td></tr>`;
+      <td><select class="input" style="min-height:34px;padding:4px 8px;width:auto" data-chg="assign" data-id="${esc(id)}" aria-label="Група студента">${opts(st.classId)}</select></td>
+      <td><button class="btn sm ${S.delStu === id ? "danger" : "ghost"}" data-act="delStu" data-arg="${esc(id)}" title="Видалити профіль студента">${S.delStu === id ? "Точно видалити?" : "Видалити"}</button></td></tr>`;
   }).join("");
-  return `<div class="tablewrap"><table><thead><tr><th>Студент</th><th class="n">Опановано</th><th class="n">Повторити</th><th class="n">Вчить</th><th class="n">Граматика</th><th class="n">Точність</th><th class="n">Вправи</th><th class="n">Серія</th><th class="n">Бали</th><th class="n">Тиждень</th><th class="n">Нагороди</th><th>Активність</th><th>Група</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  return `<div class="tablewrap"><table><thead><tr><th>Студент</th><th class="n">Опановано</th><th class="n">Повторити</th><th class="n">Вчить</th><th class="n">Граматика</th><th class="n">Точність</th><th class="n">Вправи</th><th class="n">Серія</th><th class="n">Бали</th><th class="n">Тиждень</th><th class="n">Нагороди</th><th>Активність</th><th>Група</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 // =====================================================================
@@ -5015,6 +5018,14 @@ const ACT = {
       for (const col of ["hwsub", "hwfb"]) for (const d of Object.values(S[col] || {})) if (d.hwId === id) await S.db.doc(col + "/" + d.id).delete().catch(() => {});
       await S.db.doc("homework/" + id).delete(); S.hwSel = null; toast("ДЗ видалено"); render();
     } catch(e){ toast("Не вдалося видалити"); }
+  },
+  async delStu(id){
+    if (!S.isTeacher) return;
+    if (S.delStu !== id){ S.delStu = id; render(); setTimeout(() => { if (S.delStu === id){ S.delStu = null; render(); } }, 6000); return; }
+    S.delStu = null;
+    try { await S.db.doc("students/" + id).delete(); await S.db.doc("progress/" + id).delete().catch(() => {}); toast("Профіль студента видалено"); }
+    catch(e){ toast("Не вдалося видалити"); }
+    render();
   },
   tachNext(){ S.modal = null; if ((S.tachQueue || []).length) tShowNext(); else { renderModal(); render(); } },
   tachAll(){ S.modal = null; S.tachQueue = []; renderModal(); S.gram = null; S.view = {name: "awards"}; render(); window.scrollTo(0, 0); },
