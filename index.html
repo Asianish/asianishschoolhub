@@ -4082,7 +4082,15 @@ function exMenu(ctx){
 }
 
 // ---- main view
+const EX_NOPY_TYPES = new Set(["pinyin", "dict", "sound", "listen", "adet", "lrec"]), EX_NOPY_SHOW = new Set(["py", "han2py", "sound", "listen", "adet"]);
 function exView(){
+  const html = exView0(), e = S.ex, ctx = currentCtx();
+  if (!e || e.key !== ctx.key || !e.running || e.finished) return html;
+  const q = Array.isArray(e.qs) ? e.qs[e.i] : null;
+  if (EX_NOPY_TYPES.has(e.type) || (q && EX_NOPY_SHOW.has(q.show))) return html;
+  return `<div class="pyrow">${pyToggle(ctx.level)}</div>` + pyMaybe(ctx.level, html);
+}
+function exView0(){
   const ctx = currentCtx(); const every = wordsOf(ctx.lessons), cvAll = wordsOf(ctx.cv), bank = ctx.preview ? [] : bankWords();
   if (!every.length && !cvAll.length && !bank.length) return emptyBox("练", "Вправ поки немає", ctx.preview ? "Додайте урок для цього курсу." : "Вони з'являться разом із першим уроком.");
   const e = S.ex;
@@ -4576,13 +4584,16 @@ const pyRun = run => pyTokens(run).map(([w, p]) => p ? `<ruby>${w}<rt>${p}</rt><
 function pyHtml(html){
   const parts = String(html).split(/(<[^>]+>)/);
   let skip = 0;
+  let field = 0;
   return parts.map(p => {
     if (p.startsWith("<")){
-      if (/^<(span|div)[^>]*class="[^"]*\bnopy\b/.test(p)) skip = 1;
+      if (/^<(textarea|select)\b/i.test(p)) field = 1;
+      else if (/^<\/(textarea|select)>/i.test(p)) field = 0;
+      else if (/^<(span|div)[^>]*class="[^"]*\bnopy\b/.test(p)) skip = 1;
       else if (skip && /^<\/(span|div)>/.test(p)) skip = 0;
       return p;
     }
-    return skip ? p : p.replace(/[㐀-鿿]+/g, pyRun);
+    return skip || field ? p : p.replace(/[㐀-鿿]+/g, pyRun);
   }).join("");
 }
 const pyOn = () => { try { return localStorage.getItem("asianish.py") !== "0"; } catch(e){ return true; } };
