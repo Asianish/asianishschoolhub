@@ -10,7 +10,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 rx=%2214%22 fill=%22%2323483F%22/%3E%3Ctext x=%2232%22 y=%2245%22 font-size=%2236%22 text-anchor=%22middle%22 fill=%22%23C9A15D%22 font-family=%22serif%22%3E中%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500;600&family=Manrope:wght@500;600;700&family=Noto+Sans+SC:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,600&family=Manrope:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Sans+KR:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&family=Noto+Serif+SC:wght@600&family=Noto+Serif+KR:wght@600&family=Noto+Serif+JP:wght@600&display=swap">
 <style>
 /* Layout: jade header band with a gold seal; milk "ledger" paper below; cards only for things you can open or press. */
 :root{
@@ -23,9 +23,10 @@
   --silver:#9AA09D; --bronze:#B07A4E;
   --shadow:0 1px 2px rgba(35,72,63,.06),0 10px 28px rgba(35,72,63,.08);
   --f-display:"Cormorant Garamond",Georgia,"Times New Roman",serif;
-  --f-body:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-body:"Manrope",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   --f-ui:"Manrope",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   --f-han:"Noto Sans SC","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Source Han Sans SC",sans-serif;
+  --f-deco:"Noto Serif SC","Noto Sans SC","Songti SC","SimSun",serif;
   --r:16px; --r-sm:10px;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
@@ -476,15 +477,18 @@ h1,h2,h3,.num,.code,table td.n,table th.n{font-variant-numeric:lining-nums tabul
    H1 Cormorant Garamond Medium 48–60 · H2 page title Cormorant Medium 36–44 · H3 section Manrope SemiBold 22–26
    subtitle Manrope Medium 17–20 · body Inter 15–17 · keywords & buttons Manrope SemiBold · meta Inter 12–13 · big numbers Manrope Medium 32–40 */
 body{font-family:var(--f-body);font-size:16px;font-weight:400;line-height:1.6}
-h1{font-family:var(--f-display);font-weight:500;font-size:clamp(2.4rem,4.6vw,3.75rem);line-height:1.05;letter-spacing:0}
+h1{font-family:var(--f-display);font-weight:600;font-size:clamp(2.4rem,4.6vw,3.75rem);line-height:1.05;letter-spacing:0}
 h1.pt,.reg h1{font-size:clamp(2.1rem,3.8vw,2.75rem)}
-h2,h3{font-family:var(--f-ui);font-weight:600;letter-spacing:-.01em;line-height:1.25}
-h2{font-size:clamp(1.3rem,2.2vw,1.625rem)}
-h3{font-size:clamp(1.2rem,1.9vw,1.375rem)}
-.ccard h3{font-size:clamp(1.2rem,1.9vw,1.375rem)}
+h2,h3{font-family:var(--f-display);font-weight:600;letter-spacing:0;line-height:1.2}
+h2{font-size:clamp(1.55rem,2.6vw,1.95rem)}
+h3{font-size:clamp(1.35rem,2.1vw,1.6rem)}
+.ccard h3{font-size:clamp(1.35rem,2.1vw,1.6rem)}
 .hero .sub,.sub{font-family:var(--f-ui);font-weight:500;font-size:clamp(1.0625rem,1.6vw,1.25rem)}
 b,strong{font-family:var(--f-ui);font-weight:600}
 .han b,.hanzi b{font-family:inherit}
+.sp-ko{--f-han:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;--f-deco:"Noto Serif KR","Noto Sans KR","AppleMyungjo","Batang",serif}
+.sp-ja{--f-han:"Noto Sans JP","Hiragino Sans","Yu Gothic","Meiryo",sans-serif;--f-deco:"Noto Serif JP","Noto Sans JP","Hiragino Mincho ProN","Yu Mincho",serif}
+.seal,.corner,.glyph,.spg,.spbig,.loading .han,.empty .han{font-family:var(--f-deco)!important;font-weight:600}
 .btn,.tab,.chip,.pill,.opt,.seg button,.lvl,.link,.field label,.check,th,.code{font-family:var(--f-ui)}
 .btn{font-weight:600;font-size:1rem}
 .btn.sm{font-size:.875rem}
@@ -1450,6 +1454,7 @@ const curSpace = () => adminSpaces() ? S.space : "zh";
 function brandSync(){
   const sp = curSpace(), seal = document.querySelector(".brand .seal"), wm = document.querySelector(".brand .wm");
   if (!seal || !wm) return;
+  document.body.classList.toggle("sp-ko", sp === "ko"); document.body.classList.toggle("sp-ja", sp === "ja");
   if (sp && SPACES[sp]){ seal.textContent = SPACES[sp].seal; wm.innerHTML = "ASIANISH <b>" + SPACES[sp].wm + "</b>"; }
   else { seal.textContent = "亚"; wm.innerHTML = "ASIANISH <b>SCHOOL</b>"; }
 }
@@ -1752,8 +1757,8 @@ function spacePickView(){
     const meta = p.ready
       ? `<span>${teachersSorted().length} ${plural(teachersSorted().length,"викладач","викладачі","викладачів")}</span><span>${Object.keys(S.students).length} ${plural(Object.keys(S.students).length,"студент","студенти","студентів")}</span><span>${Object.keys(S.lessons).length} ${plural(Object.keys(S.lessons).length,"урок","уроки","уроків")}</span>`
       : `<span class="pill">Простір готується</span>`;
-    return `<button class="spcard" data-act="space" data-arg="${id}"><span class="spbig" aria-hidden="true">${p.seal}</span><span class="spg" aria-hidden="true">${p.seal}</span>
-      <span class="eyebrow">ASIANISH ${p.wm} · ${p.levels}</span><h3>${p.name}</h3><span class="spn">${p.native}</span><div class="meta">${meta}</div></button>`; };
+    return `<button class="spcard sp-${id}" data-act="space" data-arg="${id}"><span class="spbig" aria-hidden="true">${p.seal}</span><span class="spg" aria-hidden="true">${p.seal}</span>
+      <span class="eyebrow">ASIANISH ${p.wm} · ${p.levels}</span><h3>${p.name}</h3><span class="spn han" lang="${id}">${p.native}</span><div class="meta">${meta}</div></button>`; };
   return `<div class="stack">
     <section class="hero"><div><div class="eyebrow">Кабінет адміністратора</div><h1>${esc(school)}</h1><p class="sub">Оберіть мовний простір — у кожному свої викладачі, групи, уроки й рейтинг.</p></div></section>
     <div class="spgrid">${["zh", "ko", "ja"].map(card).join("")}</div>
@@ -1768,9 +1773,9 @@ function spaceSoonView(id){
     ["练", "Вправи й картки", id === "ko" ? "Картки, тести, аудіювання, вправи на хангиль." : "Картки, тести, аудіювання, вправи на кану й читання кандзі."],
     ["作", "Домашні завдання", "ДЗ з фото, голосовими й перевіркою — як у китайській."],
     ["榜", "Рейтинг", "Окремий рейтинг студентів " + (id === "ko" ? "корейської" : "японської") + "."]];
-  return `<div class="stack">
+  return `<div class="stack sp-${id}">
     <div class="crumb"><button class="link" data-act="spaces">← Усі мови</button><span>/</span><span>${p.name}</span></div>
-    <section class="hero"><div><div class="eyebrow">Кабінет адміністратора · ${p.levels}</div><h1>ASIANISH ${p.wm}</h1><p class="sub">${p.name} · <span class="han">${p.native}</span></p></div></section>
+    <section class="hero"><div><div class="eyebrow">Кабінет адміністратора · ${p.levels}</div><h1>ASIANISH ${p.wm}</h1><p class="sub">${p.name} · <span class="han" lang="${id}">${p.native}</span></p></div></section>
     <div class="note info"><span>🛠</span><span>Простір ${id === "ko" ? "корейської" : "японської"} мови готується. Тут з'являться ті самі розділи, що й у китайській, — зі своїми рівнями ${lv} і вправами для цієї мови. Китайський простір працює як раніше.</span></div>
     <section><div class="sh"><h2>Що тут буде</h2></div>
       <div class="exgrid">${soon.map(([g, b, t]) => `<div class="excard soon" aria-disabled="true"><span class="glyph">${g}</span><b>${b}</b><span class="small muted">${t}</span><span class="pill">Скоро</span></div>`).join("")}</div></section>
@@ -1791,7 +1796,7 @@ function adminHome(){
   };
   return `<div class="stack">
     <section class="hero">
-      <div><div class="crumb" style="margin-bottom:8px"><button class="link" data-act="spaces">← Усі мови</button><span>/</span><span>Китайська мова</span></div><div class="eyebrow">Кабінет адміністратора · ASIANISH CHINESE</div><h1>${esc(school)}</h1><p class="sub">Викладачі, групи й учні китайської мови</p></div>
+      <div><div class="crumb" style="margin-bottom:8px"><button class="link" data-act="spaces">← Усі мови</button><span>/</span><span>Китайська мова</span></div><div class="eyebrow">Кабінет адміністратора · HSK 1–6</div><h1>ASIANISH CHINESE</h1><p class="sub">Китайська мова · <span class="han">中文</span></p></div>
       <div class="hero-stats">
         <div class="hs"><b class="num">${ts.length}</b><span>викладачів</span></div>
         <div class="hs"><b class="num">${Object.keys(S.students).length}</b><span>студентів</span></div>
