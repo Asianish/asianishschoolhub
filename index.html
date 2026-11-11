@@ -343,6 +343,27 @@ textarea.input{min-height:110px;resize:vertical;font-family:var(--f-body)}
 .qprompt .sent{font-family:var(--f-han);font-size:1.5rem;line-height:1.6}
 .qprompt .py{font-size:1.4rem;color:var(--gold-ink);font-weight:600}
 .opts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.hangul .hgtabs{flex-wrap:wrap}
+.hangul h3{margin:6px 0 0}
+.hggrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.hgcard{display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;cursor:pointer;border:1px solid var(--line);padding:14px 16px;font:inherit;color:var(--fg)}
+.hgcard:hover{border-color:var(--gold)}
+.hgl{font-family:"Noto Sans KR","Noto Serif KR",sans-serif;font-size:2.4rem;line-height:1.1;color:var(--gold-ink,#8a6a2f);font-weight:500}
+.hgr{font-size:1.05rem;letter-spacing:.02em}
+.hgex{font-family:"Noto Sans KR",sans-serif;font-size:.85rem;color:var(--muted)}
+.hgbig{font-family:"Noto Sans KR","Noto Serif KR",sans-serif;font-size:3.4rem;line-height:1;font-weight:500;color:var(--fg)}
+.hgschema{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.hgsc{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px;border:1px dashed var(--line);border-radius:var(--r-sm);text-align:center}
+.hgsteps{margin:0;padding-left:20px;display:grid;gap:4px}
+.hgtrio{display:grid;gap:8px}.hgtr{display:flex;gap:8px;flex-wrap:wrap}
+.hgtr .chip{font-family:"Noto Sans KR",sans-serif;font-size:1.05rem}
+.hgfin{display:grid;gap:10px}.hgfrow{display:flex;gap:16px;align-items:center;padding:12px 16px}
+.hgpick{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.hgpick .chip{font-family:"Noto Sans KR",sans-serif;font-size:1.05rem;min-width:40px;justify-content:center}
+.hgres{display:flex;align-items:center;gap:18px}
+.hgrules{display:grid;gap:8px}.hgrule{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.hgw{font-family:"Noto Sans KR",sans-serif;font-size:1.25rem;font-weight:600}
+.hgq{display:flex;flex-direction:column;align-items:center;gap:8px;padding:10px 0}
+.opt.hgo{font-family:"Noto Sans KR",sans-serif;font-size:1.5rem;text-align:center}
 @media (max-width:480px){.opts{grid-template-columns:1fr}}
 .opt{padding:14px 16px;border-radius:var(--r-sm);border:1px solid var(--line);background:var(--surface);cursor:pointer;font-weight:600;text-align:left;min-height:52px;color:var(--fg)}
 .opt.h{font-family:var(--f-han);font-size:1.35rem;font-weight:500;text-align:center}
@@ -1287,17 +1308,45 @@ function pickZhVoice(){
     if (best) zhVoice = best;
     let kb = null, ks = -1; for (const v of vs){ const sc = koVoiceScore(v); if (sc > ks){ ks = sc; kb = v; } } if (kb) koVoice = kb; } catch(e){}
 }
+// Online voice: used when the browser has no Chinese / Korean voice (Firefox on Windows, some tablets) or its voice stays silent.
+let ttsAudio = null, speakWD = 0;
+const TTS_SILENT = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=";
+function ttsEl(){ if (!ttsAudio){ ttsAudio = new Audio(); ttsAudio.preload = "auto"; } return ttsAudio; }
+function speakNet(text, lang){
+  const parts = String(text || "").match(/[^。！？.!?；;，,]+[。！？.!?；;，,]*/g) || [String(text || "")];
+  const chunks = []; let cur = "";
+  for (const p of parts){ if (cur && (cur + p).length > 150){ chunks.push(cur); cur = p; } else cur += p; }
+  if (cur.trim()) chunks.push(cur);
+  const a = ttsEl(); let k = 0;
+  const next = () => { if (k >= chunks.length){ a.onended = null; return; }
+    a.src = "https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=" + lang + "&q=" + encodeURIComponent(chunks[k++].trim());
+    const pr = a.play(); if (pr && pr.catch) pr.catch(() => toast("Натисніть ще раз на кнопку звуку 🔊")); };
+  a.onended = next; a.onerror = () => toast("Озвучення не вдалося. Перевірте інтернет або відкрийте сторінку в Chrome.");
+  next();
+}
 function speak(text){
+  const ko = LANG_CUR === "ko", lang = ko ? "ko" : "zh-CN";
+  clearTimeout(speakWD);
+  try { if (ttsAudio && !ttsAudio.paused) ttsAudio.pause(); } catch(e){}
+  const has = "speechSynthesis" in window && typeof SpeechSynthesisUtterance !== "undefined";
+  // Unlock the audio element inside the click (iPad / iPhone allow sound only after a tap).
+  if (!ttsAudio){ try { const a = ttsEl(); a.src = TTS_SILENT; const pr = a.play(); if (pr && pr.catch) pr.catch(() => {}); } catch(e){} }
+  if (!has){ speakNet(text, lang); return; }
   try {
-    if (!("speechSynthesis" in window)) throw 0;
-    const ko = LANG_CUR === "ko";
     if (ko ? !koVoice : !zhVoice) pickZhVoice();
-    const vv = ko ? koVoice : zhVoice;
+    const vv = ko ? koVoice : zhVoice, known = (speechSynthesis.getVoices() || []).length > 0;
+    if (known && !vv){ speakNet(text, lang); return; }
     const u = new SpeechSynthesisUtterance(text); u.lang = vv?.lang || (ko ? "ko-KR" : "zh-CN");
     u.rate = /Natural|Neural|Online|Google/i.test(vv?.name || "") ? .9 : .82;
-    if (vv) u.voice = vv;
-    speechSynthesis.cancel(); speechSynthesis.speak(u);
-  } catch(e){ toast("Озвучення недоступне в цьому браузері"); }
+    if (vv) try { u.voice = vv; } catch(e){}
+    let started = false;
+    u.onstart = () => { started = true; clearTimeout(speakWD); };
+    u.onerror = e => { if (!started && e.error !== "interrupted" && e.error !== "canceled"){ clearTimeout(speakWD); speakNet(text, lang); } };
+    if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel();
+    try { speechSynthesis.resume(); } catch(e){}
+    speechSynthesis.speak(u);
+    speakWD = setTimeout(() => { if (!started && !speechSynthesis.speaking){ try { speechSynthesis.cancel(); } catch(e){} speakNet(text, lang); } }, 1600);
+  } catch(e){ speakNet(text, lang); }
 }
 try { pickZhVoice(); speechSynthesis.addEventListener("voiceschanged", pickZhVoice); } catch(e){}
 const speakBtn = (t, label) => `<button class="iconbtn" data-act="speak" data-say="${esc(t)}" aria-label="${label || "Озвучити"}">${ICON_SPEAK}</button>`;
@@ -1760,7 +1809,7 @@ function bar(label, right, m, l, total){
 }
 function emptyBox(han, title, text, action){ return `<div class="empty"><span class="han">${han}</span><b style="color:var(--fg)">${title}</b><span>${text}</span>${action || ""}</div>`; }
 function modeSwitch(mode){
-  return `<div class="seg" role="group" aria-label="Розділ"><button aria-pressed="${mode !== "grammar" && mode !== "texts"}" data-act="mode" data-arg="vocab"><span class="han">词</span>Лексика</button><button aria-pressed="${mode === "grammar"}" data-act="mode" data-arg="grammar"><span class="han">语</span>Граматика</button><button aria-pressed="${mode === "texts"}" data-act="mode" data-arg="texts"><span class="han">阅</span>Тексти</button></div>`;
+  return `<div class="seg" role="group" aria-label="Розділ"><button aria-pressed="${mode !== "grammar" && mode !== "texts" && mode !== "hangul"}" data-act="mode" data-arg="vocab"><span class="han">词</span>Лексика</button><button aria-pressed="${mode === "grammar"}" data-act="mode" data-arg="grammar"><span class="han">语</span>Граматика</button>${LANG_CUR === "ko" ? `<button aria-pressed="${mode === "hangul"}" data-act="mode" data-arg="hangul"><span class="han">한</span>Хангиль</button>` : `<button aria-pressed="${mode === "texts"}" data-act="mode" data-arg="texts"><span class="han">阅</span>Тексти</button>`}</div>`;
 }
 
 // =====================================================================
@@ -2387,7 +2436,7 @@ function mySkillsTab(){
 
 function classView(c){
   const tab = S.view.tab || "overview";
-  const tabs = tabsHtml([["overview","Огляд"],["prog","Прогрес"],["lessons","Лексика за рівнями"],["cvl","Лексика з уроків"],["cards","Картки"],["grammar","Граматика"],["ex","Вправи"],["texts","Тексти"],["hw","ДЗ"],["rank","Рейтинг"],["settings","Налаштування"]], tab);
+  const tabs = tabsHtml([["overview","Огляд"],["prog","Прогрес"],["lessons","Лексика за рівнями"],["cvl","Лексика з уроків"],["cards","Картки"],["grammar","Граматика"],["ex","Вправи"],lvLang(c.course || HSK[0]) === "ko" ? ["hangul","Хангиль"] : ["texts","Тексти"],["hw","ДЗ"],["rank","Рейтинг"],["settings","Налаштування"]], tab);
   let body = "";
   if (tab === "overview") body = classOverview(c);
   else if (tab === "lessons") body = classLessons(c);
@@ -2400,6 +2449,7 @@ function classView(c){
   else if (tab === "settings") body = classSettings(c);
   else if (tab === "hw") body = hwListStaff(c.id);
   else if (tab === "texts") body = previewNote() + textsView();
+  else if (tab === "hangul") body = previewNote() + hangulView();
   return `<div class="stack">
     ${backCrumb(c.name)}
     <div class="spread"><div><div class="eyebrow">${c.kind === "individual" ? "Індивідуальне навчання" : "Група"} · ${esc(lvName(c.course || HSK[0]))}${ageBadge(c) ? " · " + ageBadge(c) : ""}</div><h1 class="pt">${esc(c.name)}</h1>${c.schedule ? `<div class="row" style="margin-top:10px;gap:6px">${scheduleChips(c.schedule)}</div>` : ""}</div>
@@ -2930,8 +2980,11 @@ function studentView(){
   const storeNote = S.store === "test" ? `<div class="note info" style="border:1px solid var(--gold)"><span>🧪</span><span><b>Режим студента (тест).</b> Ви бачите кабінет так, як його бачить студент ${S.classes[S.testAs.classId]?.kind === "individual" ? "" : "групи "}«${esc(S.classes[S.testAs.classId]?.name || "")}». Усе працює, але нічого не зберігається і не потрапляє в рейтинг. <button class="link" data-act="exitTest">Вийти</button></span></div>`
     : S.store === "local" ? `<div class="note"><span>📱</span><span><b>Прогрес зберігається лише на цьому пристрої</b> і не потрапляє в рейтинг. Попросіть викладачку надати вам доступ до платформи з роллю <b>Contributor</b>, і після оновлення сторінки профіль синхронізується.</span></div>` : "";
   let inner;
+  if (S.mode === "hangul" && LANG_CUR !== "ko") S.mode = "vocab";
+  if (S.mode === "texts" && LANG_CUR === "ko") S.mode = "vocab";
   if (S.mode === "grammar") inner = grammarView();
   else if (S.mode === "texts") inner = textsView();
+  else if (S.mode === "hangul") inner = hangulView();
   else {
     const tab = S.view.tab || "dash"; let body = "";
     if (tab === "dash") body = dashView();
@@ -2949,7 +3002,7 @@ function studentView(){
   }
   return `<div class="stack">
     <div class="stuhead"><div class="stuname"><div class="eyebrow">${c ? esc(c.name) + (c.schedule ? " · " + esc(c.schedule) : "") : "Без групи"}${S.teachers[c?.teacherId] ? " · викладач " + esc(S.teachers[c.teacherId].name) : ""}</div><h1 class="pt">${esc(S.me.name)}</h1></div><div class="stutools">${pomoHtml()}${modeSwitch(S.mode)}</div></div>
-    ${ytUrl() && S.mode !== "grammar" && S.mode !== "texts" && (S.view.tab || "dash") === "dash" ? `<a class="freebar" href="${esc(ytUrl())}" target="_blank" rel="noopener noreferrer" title="Відкриється YouTube у новому вікні">
+    ${ytUrl() && S.mode !== "grammar" && S.mode !== "texts" && S.mode !== "hangul" && (S.view.tab || "dash") === "dash" ? `<a class="freebar" href="${esc(ytUrl())}" target="_blank" rel="noopener noreferrer" title="Відкриється YouTube у новому вікні">
       <span class="fb-ic" aria-hidden="true"><svg viewBox="0 0 28 20" width="30" height="22"><rect width="28" height="20" rx="5" fill="#E62117"/><path d="M11 5.5v9l8-4.5z" fill="#fff"/></svg></span>
       <span class="fb-t"><b>Безкоштовні уроки</b><span class="small muted koraw">Відеоуроки Asianish School на YouTube — китайська, корейська, японська</span></span>
       <span class="fb-go">Відкрити <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg></span></a>` : ""}
@@ -3989,6 +4042,157 @@ function txWords(t){
 // the most basic one-character words are not listed under a text
 const TX_STOP = "的了吗呢吧我你他她它们是不没很也都和在有这那个一二三四五六七八九十两几要会能就还又再太最好大小多少去来说看人家天年月日点上下里个吧啊";
 const txRec = (st, id) => st?.texts?.[id] || null;
+// =====================================================================
+// HANGEUL — «Хангиль»: Korean alphabet for beginners (Korean space only).
+// Letters, syllable blocks, final consonants, reading rules, a syllable builder and practice.
+// =====================================================================
+const HG_V = [ // vowel, romanization, Ukrainian approximation, kind (v = vertical, h = horizontal, c = compound)
+  ["ㅏ","a","а","v"],["ㅑ","ya","я","v"],["ㅓ","eo","о відкрите (рот ширше, губи не округлені)","v"],["ㅕ","yeo","йо відкрите","v"],
+  ["ㅗ","o","о (губи округлені)","h"],["ㅛ","yo","йо","h"],["ㅜ","u","у","h"],["ㅠ","yu","ю","h"],["ㅡ","eu","и, але губи розтягнуті в посмішку","h"],["ㅣ","i","і","v"]];
+const HG_V2 = [["ㅐ","ae","е (трохи ширше)"],["ㅒ","yae","є"],["ㅔ","e","е"],["ㅖ","ye","є"],["ㅘ","wa","уа (ва)"],["ㅙ","wae","уе (ве)"],["ㅚ","oe","уе (ве)"],["ㅝ","wo","уо (во)"],["ㅞ","we","уе (ве)"],["ㅟ","wi","уі (ві)"],["ㅢ","ui","иі"]];
+const HG_C = [ // consonant, name, romanization at start / at the end, Ukrainian approximation, group
+  ["ㄱ","기역","g / k","між «г» і «к»","b"],["ㄴ","니은","n","н","b"],["ㄷ","디귿","d / t","між «д» і «т»","b"],["ㄹ","리을","r / l","між голосними — «р», у кінці — «л»","b"],
+  ["ㅁ","미음","m","м","b"],["ㅂ","비읍","b / p","між «б» і «п»","b"],["ㅅ","시옷","s / t","с (перед ㅣ — м'яке «щ»)","b"],["ㅇ","이응","— / ng","на початку не читається, у кінці — «нг»","b"],
+  ["ㅈ","지읒","j / t","дж (м'яко)","b"],["ㅎ","히읗","h","легке «х»","b"],
+  ["ㅊ","치읓","ch / t","ч із видихом","a"],["ㅋ","키읔","k","к із сильним видихом","a"],["ㅌ","티읕","t","т із сильним видихом","a"],["ㅍ","피읖","p","п із сильним видихом","a"],
+  ["ㄲ","쌍기역","kk","напружене «к» без видиху","t"],["ㄸ","쌍디귿","tt","напружене «т»","t"],["ㅃ","쌍비읍","pp","напружене «п»","t"],["ㅆ","쌍시옷","ss","напружене «с»","t"],["ㅉ","쌍지읒","jj","напружене «дж» (ближче до «ч»)","t"]];
+const HG_INI = ["ㄱ","ㄲ","ㄴ","ㄷ","ㄸ","ㄹ","ㅁ","ㅂ","ㅃ","ㅅ","ㅆ","ㅇ","ㅈ","ㅉ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"];
+const HG_VOW = ["ㅏ","ㅐ","ㅑ","ㅒ","ㅓ","ㅔ","ㅕ","ㅖ","ㅗ","ㅘ","ㅙ","ㅚ","ㅛ","ㅜ","ㅝ","ㅞ","ㅟ","ㅠ","ㅡ","ㅢ","ㅣ"];
+const HG_FIN = ["","ㄱ","ㄲ","ㄳ","ㄴ","ㄵ","ㄶ","ㄷ","ㄹ","ㄺ","ㄻ","ㄼ","ㄽ","ㄾ","ㄿ","ㅀ","ㅁ","ㅂ","ㅄ","ㅅ","ㅆ","ㅇ","ㅈ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"];
+const HG_FIN_EASY = ["","ㄱ","ㄴ","ㄷ","ㄹ","ㅁ","ㅂ","ㅅ","ㅆ","ㅇ","ㅈ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ","ㄲ"];
+const hgSyl = (i, v, f) => String.fromCharCode(0xAC00 + (i * 21 + v) * 28 + f);
+// Revised Romanization with the main sound-change rules (liaison, nasalization, ㄹ, aspiration).
+const HG_IR = {"ㄱ":"g","ㄲ":"kk","ㄴ":"n","ㄷ":"d","ㄸ":"tt","ㄹ":"r","ㅁ":"m","ㅂ":"b","ㅃ":"pp","ㅅ":"s","ㅆ":"ss","ㅇ":"","ㅈ":"j","ㅉ":"jj","ㅊ":"ch","ㅋ":"k","ㅌ":"t","ㅍ":"p","ㅎ":"h"};
+const HG_VR = ["a","ae","ya","yae","eo","e","yeo","ye","o","wa","wae","oe","yo","u","wo","we","wi","yu","eu","ui","i"];
+const HG_FEND = {"":"","ㄱ":"k","ㄲ":"k","ㄳ":"k","ㄴ":"n","ㄵ":"n","ㄶ":"n","ㄷ":"t","ㄹ":"l","ㄺ":"k","ㄻ":"m","ㄼ":"l","ㄽ":"l","ㄾ":"l","ㄿ":"p","ㅀ":"l","ㅁ":"m","ㅂ":"p","ㅄ":"p","ㅅ":"t","ㅆ":"t","ㅇ":"ng","ㅈ":"t","ㅊ":"t","ㅋ":"k","ㅌ":"t","ㅍ":"p","ㅎ":"t"};
+const HG_LIA = {"ㄱ":["","ㄱ"],"ㄲ":["","ㄲ"],"ㄳ":["ㄱ","ㅅ"],"ㄴ":["","ㄴ"],"ㄵ":["ㄴ","ㅈ"],"ㄶ":["","ㄴ"],"ㄷ":["","ㄷ"],"ㄹ":["","ㄹ"],"ㄺ":["ㄹ","ㄱ"],"ㄻ":["ㄹ","ㅁ"],"ㄼ":["ㄹ","ㅂ"],"ㄽ":["ㄹ","ㅅ"],"ㄾ":["ㄹ","ㅌ"],"ㄿ":["ㄹ","ㅍ"],"ㅀ":["","ㄹ"],"ㅁ":["","ㅁ"],"ㅂ":["","ㅂ"],"ㅄ":["ㅂ","ㅅ"],"ㅅ":["","ㅅ"],"ㅆ":["","ㅆ"],"ㅈ":["","ㅈ"],"ㅊ":["","ㅊ"],"ㅋ":["","ㅋ"],"ㅌ":["","ㅌ"],"ㅍ":["","ㅍ"],"ㅎ":["",""]};
+const HG_CLS = {"ㄱ":"k","ㄲ":"k","ㄳ":"k","ㄺ":"k","ㅋ":"k","ㄷ":"t","ㅅ":"t","ㅆ":"t","ㅈ":"t","ㅊ":"t","ㅌ":"t","ㅎ":"t","ㅂ":"p","ㅄ":"p","ㄿ":"p","ㅍ":"p","ㄼ":"l","ㄽ":"l","ㄾ":"l","ㅀ":"l","ㄹ":"l","ㄴ":"n","ㄵ":"n","ㄶ":"n","ㅁ":"m","ㄻ":"m","ㅇ":"ng"};
+function hgSplit(ch){ const c = ch.charCodeAt(0) - 0xAC00; if (c < 0 || c > 11171) return null; return {i: HG_INI[Math.floor(c / 588)], v: Math.floor((c % 588) / 28), f: HG_FIN[c % 28]}; }
+function hgWord(w){
+  const S2 = [...w].map(hgSplit); if (S2.some(x => !x)) return w;
+  for (let k = 0; k < S2.length - 1; k++){
+    const a = S2[k], b = S2[k + 1]; if (!a.f) continue;
+    if (b.i === "ㅇ"){ if (a.f === "ㅇ") continue; const [stay, mv] = HG_LIA[a.f]; a.f = stay; b.i = mv || "ㅇ"; if (b.v === 20 && !stay){ if (b.i === "ㄷ") b.i = "ㅈ"; else if (b.i === "ㅌ") b.i = "ㅊ"; } continue; }
+    if (b.i === "ㅎ"){ const cl = HG_CLS[a.f]; if (a.f === "ㄶ"){ a.f = "ㄴ"; b.i = "ㄴ"; continue; } if (a.f === "ㅀ"){ a.f = "ㄹ"; b.i = "ㄹ"; continue; } if (cl === "k" || cl === "t" || cl === "p"){ b.i = {k: "ㅋ", t: "ㅌ", p: "ㅍ"}[cl]; a.f = ""; } continue; }
+    if (a.f === "ㅎ" || a.f === "ㄶ" || a.f === "ㅀ"){ const base = a.f === "ㅎ" ? "" : a.f === "ㄶ" ? "ㄴ" : "ㄹ"; const asp = {"ㄱ":"ㅋ","ㄷ":"ㅌ","ㅈ":"ㅊ"}[b.i]; if (asp){ a.f = base; b.i = asp; continue; } if (b.i === "ㅅ"){ a.f = base; b.i = "ㅆ"; continue; } if (b.i === "ㄴ" && a.f === "ㅎ"){ a.f = "ㄴ"; continue; } }
+    const cl = HG_CLS[a.f];
+    if (b.i === "ㄴ" || b.i === "ㅁ"){ if (cl === "k") a.f = "ㅇ"; else if (cl === "t") a.f = "ㄴ"; else if (cl === "p") a.f = "ㅁ"; else if (cl === "l" && b.i === "ㄴ"){ a.f = "ㄹ"; b.i = "ㄹ"; } continue; }
+    if (b.i === "ㄹ"){ if (cl === "n") a.f = "ㄹ"; else if (cl === "m" || cl === "ng") b.i = "ㄴ"; else if (cl === "k"){ a.f = "ㅇ"; b.i = "ㄴ"; } else if (cl === "p"){ a.f = "ㅁ"; b.i = "ㄴ"; } else if (cl === "t"){ a.f = "ㄴ"; b.i = "ㄴ"; } continue; }
+  }
+  let out = "";
+  S2.forEach((x, k) => { let ini = HG_IR[x.i]; const prev = k ? S2[k - 1] : null; if (x.i === "ㄹ" && prev && prev.f === "ㄹ") ini = "l";
+    out += ini + HG_VR[x.v]; if (x.f){ const nx = S2[k + 1]; out += (x.f === "ㄹ" && nx && nx.i === "ㄹ") ? "l" : HG_FEND[x.f]; } });
+  return out;
+}
+const hgRom = t => String(t || "").replace(/[가-힣]+/g, hgWord);
+const HG_FINALS = [["ㄱ","k","ㄱ ㄲ ㅋ","책 (chaek) — книжка, 부엌 (bueok) — кухня"],["ㄴ","n","ㄴ","산 (san) — гора"],["ㄷ","t","ㄷ ㅅ ㅆ ㅈ ㅊ ㅌ ㅎ","옷 (ot) — одяг, 꽃 (kkot) — квітка, 낮 (nat) — день"],["ㄹ","l","ㄹ","물 (mul) — вода"],["ㅁ","m","ㅁ","밤 (bam) — ніч"],["ㅂ","p","ㅂ ㅍ","밥 (bap) — рис, 앞 (ap) — перед"],["ㅇ","ng","ㅇ","강 (gang) — річка"]];
+const HG_RULES = [
+  ["Зв'язування", "Якщо склад закінчується на приголосний, а наступний починається з ㅇ, приголосний «переходить» у наступний склад.", [["음악","으막","музика"],["한국어","한구거","корейська мова"],["읽어요","일거요","читаю"]]],
+  ["Носові звуки", "Перед ㄴ або ㅁ звуки k, t, p стають носовими: k → ng, t → n, p → m.", [["국물","궁물","бульйон"],["입니다","임니다","є (ввічливо)"],["끝나다","끈나다","закінчуватися"]]],
+  ["ㄹ поруч із ㄴ", "ㄴ і ㄹ поруч читаються як подвійне «л».", [["신라","실라","Сілла (давня держава)"],["설날","설랄","Новий рік за місячним календарем"]]],
+  ["Придих з ㅎ", "ㄱ, ㄷ, ㅂ, ㅈ поруч із ㅎ стають придиховими: ㅋ, ㅌ, ㅍ, ㅊ.", [["좋다","조타","добрий, гарний"],["축하","추카","привітання"],["입학","이팍","вступ до школи"]]],
+  ["ㅎ зникає", "Між голосними, а також після ㄴ, ㄹ, ㅁ, ㅇ звук ㅎ майже не чути.", [["좋아요","조아요","добре"],["괜찮아요","괜차나요","нічого, усе гаразд"]]],
+  ["Напружені звуки", "Після k, t, p наступні ㄱ, ㄷ, ㅂ, ㅅ, ㅈ вимовляються напружено: ㄲ, ㄸ, ㅃ, ㅆ, ㅉ.", [["학교","학꾜","школа"],["식당","식땅","їдальня"],["잡지","잡찌","журнал"]]],
+  ["ㄷ, ㅌ + 이", "ㄷ і ㅌ перед 이 читаються як ㅈ і ㅊ.", [["같이","가치","разом"],["굳이","구지","навмисно, неодмінно"]]]];
+const HG_WORDS = [["아이","дитина"],["우유","молоко"],["오이","огірок"],["나무","дерево"],["바다","море"],["나라","країна"],["모자","шапка"],["사자","лев"],["어머니","мама"],["아버지","тато"],["엄마","мама"],["아빠","тато"],["친구","друг"],["사람","людина"],["한국","Корея"],["김치","кімчхі"],["학교","школа"],["물","вода"],["밥","рис, їжа"],["책","книжка"],["사랑","любов"],["커피","кава"],["토끼","кролик"],["포도","виноград"],["가방","сумка"],["시간","час"],["선생님","учитель"],["감사합니다","дякую"],["안녕하세요","добрий день"],["고양이","кіт"],["강아지","цуценя"],["음식","їжа"],["꽃","квітка"],["딸기","полуниця"],["빵","хліб"],["눈","око; сніг"],["별","зірка"],["하늘","небо"],["바람","вітер"],["노래","пісня"]];
+const HG_SECS = [["intro","Як читати"],["vow","Голосні"],["cons","Приголосні"],["fin","Батчхім"],["build","Конструктор"],["rules","Правила читання"],["quiz","Вправи"]];
+const HG_QM = [["l2r","Буква → звук","Бачите букву — обираєте, як вона звучить."],["s2l","Звук → склад","Слухаєте склад — обираєте, як його записати."],["syl","Читаю склади","Читаєте склад — обираєте транскрипцію."],["word","Читаю слова","Читаєте просте слово — обираєте транскрипцію."]];
+const hgState = () => S.hg || (S.hg = {sec: "intro", i: 0, v: 0, f: 0, quiz: null});
+const hgSay = (t, label) => `<button class="iconbtn" data-act="speak" data-say="${esc(t)}" aria-label="${label || "Послухати"}">${ICON_SPEAK}</button>`;
+function hgLetterCard(ch, rom, uk, sayT, extra){
+  return `<button class="panel hgcard" data-act="speak" data-say="${esc(sayT)}" aria-label="Послухати ${esc(sayT)}"><span class="hgl">${ch}</span><b class="hgr">${esc(rom)}</b><span class="small muted">${esc(uk)}</span>${extra || ""}</button>`;
+}
+function hangulView(){
+  const st = hgState(), ctx = currentCtx(), me = ctx.preview || staffUI() ? null : S.me;
+  const tabs = `<div class="seg hgtabs" role="group" aria-label="Хангиль">${HG_SECS.map(([k, n]) => `<button aria-pressed="${st.sec === k}" data-act="hgSec" data-arg="${k}">${n}</button>`).join("")}</div>`;
+  let body = "";
+  if (st.sec === "intro") body = `
+    <section class="panel stack" style="gap:12px"><h3>Корейська абетка — хангиль</h3>
+      <p>Хангиль — це абетка з <b>14 основних приголосних</b> і <b>10 основних голосних</b>. Букви не пишуть у рядок, як в українській, а складають у <b>квадратні склади</b>: кожен склад — один «квадратик».</p>
+      <p>У кожному складі є <b>приголосний на початку</b> і <b>голосний</b>. Іноді знизу є ще один приголосний — <b>батчхім</b> (кінцевий звук). Якщо склад починається з голосного, на початку пишуть «німий» ㅇ.</p>
+      <div class="hgschema">
+        <div class="hgsc"><span class="hgbig">가</span><span class="small">ㄱ + ㅏ<br><b>ga</b> · голосний праворуч</span>${hgSay("가")}</div>
+        <div class="hgsc"><span class="hgbig">고</span><span class="small">ㄱ + ㅗ<br><b>go</b> · голосний знизу</span>${hgSay("고")}</div>
+        <div class="hgsc"><span class="hgbig">강</span><span class="small">ㄱ + ㅏ + ㅇ<br><b>gang</b> · з батчхімом</span>${hgSay("강")}</div>
+        <div class="hgsc"><span class="hgbig">아</span><span class="small">ㅇ + ㅏ<br><b>a</b> · ㅇ не читається</span>${hgSay("아")}</div>
+      </div>
+      <p class="small muted">Порада: «вертикальні» голосні (ㅏ ㅑ ㅓ ㅕ ㅣ) стоять праворуч від приголосного, «горизонтальні» (ㅗ ㅛ ㅜ ㅠ ㅡ) — під ним.</p>
+    </section>
+    <section class="panel stack" style="gap:10px"><h3>Як вчити</h3>
+      <ol class="hgsteps"><li>Голосні — натискайте на картку, щоб послухати.</li><li>Приголосні — зверніть увагу на трійки: звичайний, з придихом і напружений.</li><li>Батчхім — 7 кінцевих звуків.</li><li>Конструктор — складайте свої склади й слухайте їх.</li><li>Вправи — перевірте себе.</li></ol>
+    </section>`;
+  else if (st.sec === "vow") body = `
+    <p class="small muted">Натисніть на картку, щоб почути звук. Склад записано з «німим» ㅇ: так голосні пишуть, коли перед ними немає приголосного.</p>
+    <h3>Основні голосні</h3><div class="hggrid">${HG_V.map(([v, r, u, k]) => hgLetterCard(v, r, u, hgSyl(11, HG_VOW.indexOf(v), 0), `<span class="hgex">${hgSyl(11, HG_VOW.indexOf(v), 0)} · ${k === "v" ? "праворуч" : "знизу"}</span>`)).join("")}</div>
+    <h3>Складні голосні</h3><p class="small muted">Утворюються з основних: ㅏ+ㅣ = ㅐ, ㅗ+ㅏ = ㅘ, ㅜ+ㅓ = ㅝ… ㅐ і ㅔ, ㅙ, ㅚ і ㅞ сьогодні звучать майже однаково.</p>
+    <div class="hggrid">${HG_V2.map(([v, r, u]) => hgLetterCard(v, r, u, hgSyl(11, HG_VOW.indexOf(v), 0), `<span class="hgex">${hgSyl(11, HG_VOW.indexOf(v), 0)}</span>`)).join("")}</div>`;
+  else if (st.sec === "cons") { const grp = g => HG_C.filter(x => x[4] === g).map(([c, n, r, u]) => hgLetterCard(c, r, u, hgSyl(HG_INI.indexOf(c), 0, 0), `<span class="hgex">${hgSyl(HG_INI.indexOf(c), 0, 0)} · ${n}</span>`)).join("");
+    body = `<p class="small muted">Натисніть на картку — прозвучить склад з ㅏ. Під буквою — її назва. Там, де дві транскрипції (g / k), перша — на початку складу, друга — у кінці.</p>
+    <h3>Основні приголосні</h3><div class="hggrid">${grp("b")}</div>
+    <h3>З придихом</h3><p class="small muted">Вимовляються з сильним видихом — піднесіть долоню до рота й відчуйте повітря.</p><div class="hggrid">${grp("a")}</div>
+    <h3>Напружені (подвійні)</h3><p class="small muted">Вимовляються коротко й напружено, без видиху.</p><div class="hggrid">${grp("t")}</div>
+    <section class="panel stack" style="gap:8px"><h3>Трійки звуків</h3><p class="small muted">Звичайний · з придихом · напружений — порівняйте на слух.</p>
+      <div class="hgtrio">${[["ㄱ","ㅋ","ㄲ"],["ㄷ","ㅌ","ㄸ"],["ㅂ","ㅍ","ㅃ"],["ㅈ","ㅊ","ㅉ"],["ㅅ","","ㅆ"]].map(t => `<div class="hgtr">${t.map(c => c ? `<button class="chip" data-act="speak" data-say="${hgSyl(HG_INI.indexOf(c), 0, 0)}">${hgSyl(HG_INI.indexOf(c), 0, 0)} <small>${hgRom(hgSyl(HG_INI.indexOf(c), 0, 0))}</small></button>` : `<span class="chip" style="opacity:.35">—</span>`).join("")}</div>`).join("")}</div></section>`; }
+  else if (st.sec === "fin") body = `
+    <p>Батчхім — приголосний унизу складу. Букв, які можуть бути батчхімом, багато, але звучать вони лише <b>7 способами</b>.</p>
+    <div class="hgfin">${HG_FINALS.map(([c, r, set, ex]) => `<div class="panel hgfrow"><span class="hgl">${c}</span><div><b>[${r}]</b> <span class="small muted">букви: ${set}</span><div class="small">${ex.split(", ").map(e => { const w = e.split(" ")[0]; return `<button class="link" data-act="speak" data-say="${esc(w)}">${esc(e)}</button>`; }).join(" · ")}</div></div></div>`).join("")}</div>
+    <div class="note info"><span>ℹ️</span><span>Якщо після батчхіму йде склад на ㅇ, батчхім «переходить» у наступний склад і читається повністю: 옷이 → [오시]. Детальніше — у «Правилах читання».</span></div>`;
+  else if (st.sec === "build"){ const syl = hgSyl(st.i, st.v, st.f);
+    const pick = (arr, cur, act) => `<div class="hgpick">${arr.map((x, k) => `<button class="chip" aria-pressed="${k === cur}" data-act="${act}" data-arg="${k}">${x || "—"}</button>`).join("")}</div>`;
+    body = `<section class="panel stack hgbuild" style="gap:14px">
+      <div class="hgres"><span class="hgbig">${syl}</span><div><b class="hgr">${esc(hgRom(syl))}</b><div class="small muted">${HG_INI[st.i]} + ${HG_VOW[st.v]}${st.f ? " + " + HG_FIN[st.f] : ""}</div></div>${hgSay(syl, "Послухати склад")}</div>
+      <div><b>1. Приголосний на початку</b>${pick(HG_INI, st.i, "hgIni")}</div>
+      <div><b>2. Голосний</b>${pick(HG_VOW, st.v, "hgVow")}</div>
+      <div><b>3. Батчхім</b> <span class="small muted">(необов'язково)</span><div class="hgpick">${HG_FIN_EASY.map(x => { const k = HG_FIN.indexOf(x); return `<button class="chip" aria-pressed="${k === st.f}" data-act="hgFin" data-arg="${k}">${x || "без"}</button>`; }).join("")}</div></div>
+      <button class="btn sm" data-act="hgRand">🎲 Випадковий склад</button>
+    </section>`; }
+  else if (st.sec === "rules") body = `<p class="small muted">Корейською часто пишуть не так, як вимовляють. Ці правила допоможуть читати природно. Натисніть 🔊, щоб послухати.</p>
+    ${HG_RULES.map(([t, d, ex]) => `<section class="panel stack" style="gap:8px"><h3>${esc(t)}</h3><p>${esc(d)}</p><div class="hgrules">${ex.map(([w, p, u]) => `<div class="hgrule">${hgSay(w)}<span class="hgw">${w}</span><span class="muted">→</span><span>[${p}]</span><span class="small muted">${esc(hgRom(w))} · ${esc(u)}</span></div>`).join("")}</div></section>`).join("")}`;
+  else if (st.sec === "quiz") body = hgQuizView(me);
+  return `<div class="stack hangul"><div><div class="eyebrow">한글 · Корейська абетка</div><h2 style="margin:2px 0 0">Хангиль</h2></div>${tabs}${body}</div>`;
+}
+function hgQuizView(me){
+  const q = S.hg.quiz, rec = me?.hg || {};
+  if (!q) return `<p class="small muted">По 10 завдань. За правильні відповіді нараховуються бали — за кожне завдання один раз на день, як і в інших вправах.</p>
+    <div class="exgrid">${HG_QM.map(([k, n, d]) => `<button class="excard" data-act="hgStart" data-arg="${k}"><b>${n}</b><span class="small muted">${d}</span>${rec[k] != null ? `<span class="small" style="color:var(--ok)">Найкраще: ${rec[k]}/10</span>` : ""}</button>`).join("")}</div>`;
+  if (q.i >= q.qs.length){ const ok = q.ok;
+    return `<section class="panel stack" style="gap:12px;align-items:flex-start"><h3>Результат: ${ok}/${q.qs.length}</h3><p class="muted">${ok === q.qs.length ? "Чудово! Без жодної помилки." : ok >= 7 ? "Добре! Ще трохи практики — і буде ідеально." : "Повторіть букви в розділах вище й спробуйте ще раз."}</p>
+      <div class="row"><button class="btn primary" data-act="hgStart" data-arg="${q.mode}">Ще раз</button><button class="btn" data-act="hgStop">Усі вправи</button></div></section>`; }
+  const x = q.qs[q.i], a = q.ans;
+  const prompt = x.listen ? `<div class="hgq">${hgSay(x.say, "Послухати ще раз")}<span class="small muted">Прослухайте й оберіть склад</span></div>` : `<div class="hgq"><span class="hgbig">${esc(x.show)}</span>${x.hint ? `<span class="small muted">${esc(x.hint)}</span>` : ""}</div>`;
+  return `<div class="spread"><button class="link" data-act="hgStop">← Усі вправи</button><span class="small muted">${q.i + 1} з ${q.qs.length}</span></div>
+    <section class="panel stack" style="gap:14px">${prompt}
+      <div class="opts">${x.opts.map((o, k) => { const cls = a == null ? "" : k === x.a ? "right" : k === a ? "wrong" : ""; return `<button class="opt ${cls} ${x.listen ? "hgo" : ""}" data-act="hgAns" data-arg="${k}" ${a != null ? "disabled" : ""}>${esc(o)}</button>`; }).join("")}</div>
+      ${a != null ? `<div class="row" style="align-items:center;gap:10px">${!x.listen ? hgSay(x.say) : ""}<span class="${a === x.a ? "" : "muted"}">${a === x.a ? "Правильно!" : "Правильна відповідь: " + esc(x.opts[x.a])}${x.note ? " · " + esc(x.note) : ""}</span><button class="btn sm primary" data-act="hgNext" style="margin-left:auto">Далі →</button></div>` : ""}
+    </section>`;
+}
+const HG_CONF = [["가","카","까"],["다","타","따"],["바","파","빠"],["자","차","짜"],["사","싸","자"],["어","오","우"],["우","으","오"],["애","에","예"],["여","요","야"],["라","나","다"],["마","바","나"],["하","아","카"],["유","요","우"],["으","이","우"]];
+function hgMakeQs(mode){
+  const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const mk = (show, right, wrong, say, extra) => { const opts = shuffle([right, ...shuffle(wrong.filter(w => w !== right)).slice(0, 3)]); return {show, opts, a: opts.indexOf(right), say, ...extra}; };
+  const qs = [];
+  if (mode === "l2r"){ const L = shuffle([...HG_V.map(x => [x[0], x[1], hgSyl(11, HG_VOW.indexOf(x[0]), 0)]), ...HG_C.map(x => [x[0], x[2].split(" / ")[0] === "—" ? "ng" : x[2].split(" / ")[0], hgSyl(HG_INI.indexOf(x[0]), 0, 0)])]);
+    const roms = [...new Set(L.map(x => x[1]))];
+    for (const [ch, r, say] of L.slice(0, 10)) qs.push(mk(ch, r, roms, say, {key: ch})); }
+  else if (mode === "s2l"){ for (const set of shuffle(HG_CONF).slice(0, 10)){ const right = set[Math.floor(Math.random() * set.length)]; const pool = [...set, ...shuffle(HG_CONF.flat())];
+    qs.push({...mk("", right, [...new Set(pool)], right, {key: right}), listen: true}); } }
+  else if (mode === "syl"){ for (let k = 0; k < 10; k++){ const i = Math.floor(Math.random() * 19), v = [0,2,4,6,8,12,13,17,18,20][Math.floor(Math.random() * 10)], f = Math.random() < .4 ? HG_FIN.indexOf(["ㄱ","ㄴ","ㄹ","ㅁ","ㅂ","ㅇ"][Math.floor(Math.random() * 6)]) : 0;
+    const s = hgSyl(i, v, f), r = hgRom(s); const wrong = []; while (wrong.length < 8){ const w = hgRom(hgSyl(Math.random() < .5 ? i : Math.floor(Math.random() * 19), Math.random() < .5 ? v : [0,2,4,6,8,12,13,17,18,20][Math.floor(Math.random() * 10)], Math.random() < .5 ? f : 0)); if (w !== r && !wrong.includes(w)) wrong.push(w); }
+    qs.push(mk(s, r, wrong, s, {key: s})); } }
+  else { const W = shuffle(HG_WORDS).slice(0, 10), roms = HG_WORDS.map(w => hgRom(w[0]));
+    for (const [w, u] of W){ const r = hgRom(w); const near = roms.filter(x => x !== r).sort((a, b) => Math.abs(a.length - r.length) - Math.abs(b.length - r.length)).slice(0, 8); qs.push(mk(w, r, near, w, {key: w, note: u})); } }
+  return qs;
+}
+function hgAnswer(k){
+  const q = S.hg?.quiz; if (!q || q.ans != null) return; const x = q.qs[q.i]; q.ans = k; const ok = k === x.a; if (ok) q.ok++;
+  const ctx = currentCtx();
+  if (!ctx.preview && !staffUI() && S.me){ const me = S.me; me.exTotal = (me.exTotal || 0) + 1; logAdd(me, "a", 1); dailyCheck(me);
+    if (ok){ me.exOk = (me.exOk || 0) + 1; if (onceToday(me, "hg:" + q.mode + ":" + x.key)){ me.cor = (me.cor || 0) + 1; addPoints(me, PTS.correct, "e"); logAdd(me, "c", 1); } }
+    if (q.i === q.qs.length - 1){ me.hg = me.hg || {}; me.hg[q.mode] = Math.max(me.hg[q.mode] || 0, q.ok); }
+    saveMe(); }
+  if (!x.listen) speak(x.say);
+  render();
+}
 function textsView(){
   const ctx = currentCtx(); const t = S.txt && txById(S.txt.id); if (t) return textPage(t, ctx);
   const {lv, cur} = txLevels(ctx), list = TEXTS.filter(x => x.hsk === cur), me = ctx.preview ? null : S.me;
@@ -5594,6 +5798,15 @@ const ACT = {
   txBack(){ S.txt = null; render(); window.scrollTo(0, 0); },
   txTap(i){ if (S.txt){ S.txt.open[i] = !S.txt.open[i]; render(); } },
   txTr(m){ try { localStorage.setItem("asianish.txtr", m); } catch(e){} if (S.txt) S.txt.open = {}; render(); },
+  hgSec(k){ hgState().sec = k; if (k !== "quiz") S.hg.quiz = null; render(); },
+  hgIni(k){ hgState().i = +k; speak(hgSyl(S.hg.i, S.hg.v, S.hg.f)); render(); },
+  hgVow(k){ hgState().v = +k; speak(hgSyl(S.hg.i, S.hg.v, S.hg.f)); render(); },
+  hgFin(k){ hgState().f = +k; speak(hgSyl(S.hg.i, S.hg.v, S.hg.f)); render(); },
+  hgRand(){ const st = hgState(); st.i = Math.floor(Math.random() * 19); st.v = Math.floor(Math.random() * 21); st.f = Math.random() < .5 ? 0 : HG_FIN.indexOf(HG_FIN_EASY[1 + Math.floor(Math.random() * (HG_FIN_EASY.length - 1))]); speak(hgSyl(st.i, st.v, st.f)); render(); },
+  hgStart(m){ const st = hgState(); st.sec = "quiz"; st.quiz = {mode: m, qs: hgMakeQs(m), i: 0, ok: 0, ans: null}; const x = st.quiz.qs[0]; if (x?.listen) speak(x.say); render(); },
+  hgStop(){ hgState().quiz = null; render(); },
+  hgAns(k){ hgAnswer(+k); },
+  hgNext(){ const q = S.hg?.quiz; if (!q) return; q.i++; q.ans = null; const x = q.qs[q.i]; if (x?.listen) speak(x.say); render(); window.scrollTo?.(0, Math.min(window.scrollY, 200)); },
   txAns(arg){ const [qi, oi] = String(arg).split("|").map(Number); txAnswer(qi, oi); },
   txRetry(){ if (S.txt) S.txt = txState(S.txt.id); render(); },
   hwRun(arg){
