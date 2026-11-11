@@ -10,7 +10,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 rx=%2214%22 fill=%22%2323483F%22/%3E%3Ctext x=%2232%22 y=%2245%22 font-size=%2236%22 text-anchor=%22middle%22 fill=%22%23C9A15D%22 font-family=%22serif%22%3E中%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,600&family=Manrope:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Sans+KR:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&family=Noto+Serif+SC:wght@600&family=Noto+Serif+KR:wght@600&family=Noto+Serif+JP:wght@600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,600&family=Manrope:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Sans+KR:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&family=Noto+Serif+SC:wght@600&family=Gowun+Batang:wght@400;700&family=Noto+Serif+JP:wght@600&display=swap">
 <style>
 /* Layout: jade header band with a gold seal; milk "ledger" paper below; cards only for things you can open or press. */
 :root{
@@ -343,15 +343,24 @@ textarea.input{min-height:110px;resize:vertical;font-family:var(--f-body)}
 .qprompt .sent{font-family:var(--f-han);font-size:1.5rem;line-height:1.6}
 .qprompt .py{font-size:1.4rem;color:var(--gold-ink);font-weight:600}
 .opts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.spwrap{position:relative;display:inline-flex}
+.spmenu{position:absolute;top:calc(100% + 8px);right:0;z-index:60;min-width:240px;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:14px;box-shadow:0 14px 40px rgba(20,40,34,.18);padding:6px;display:grid;gap:2px}
+.spitem{display:flex;align-items:center;gap:12px;width:100%;padding:9px 10px;border:0;background:transparent;border-radius:10px;cursor:pointer;text-align:left;font:inherit;color:inherit}
+.spitem:hover,.spitem:focus-visible{background:var(--gold-soft,#F3E9D6)}
+.spitem.on{background:var(--gold-soft,#F3E9D6)}
+.spitem b{display:block;font-size:.92rem}.spitem small{display:block;color:var(--muted);font-size:.78rem}
+.spseal{display:grid;place-items:center;width:34px;height:34px;border-radius:9px;background:var(--brand,#23483F);color:var(--gold,#C9A15D);font-weight:700;flex:none}
+.spitem.all{border-top:1px solid var(--line);border-radius:0 0 10px 10px;margin-top:4px}
+.spcheck{margin-left:auto;color:var(--ok);font-weight:800}
 .hangul .hgtabs{flex-wrap:wrap}
 .hangul h3{margin:6px 0 0}
 .hggrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .hgcard{display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;cursor:pointer;border:1px solid var(--line);padding:14px 16px;font:inherit;color:var(--fg)}
 .hgcard:hover{border-color:var(--gold)}
-.hgl{font-family:"Noto Sans KR","Noto Serif KR",sans-serif;font-size:2.4rem;line-height:1.1;color:var(--gold-ink,#8a6a2f);font-weight:500}
+.hgl{font-family:"Noto Sans KR",sans-serif;font-size:2.4rem;line-height:1.1;color:var(--gold-ink,#8a6a2f);font-weight:500}
 .hgr{font-size:1.05rem;letter-spacing:.02em}
 .hgex{font-family:"Noto Sans KR",sans-serif;font-size:.85rem;color:var(--muted)}
-.hgbig{font-family:"Noto Sans KR","Noto Serif KR",sans-serif;font-size:3.4rem;line-height:1;font-weight:500;color:var(--fg)}
+.hgbig{font-family:"Noto Sans KR",sans-serif;font-size:3.4rem;line-height:1;font-weight:500;color:var(--fg)}
 .hgschema{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .hgsc{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px;border:1px dashed var(--line);border-radius:var(--r-sm);text-align:center}
 .hgsteps{margin:0;padding-left:20px;display:grid;gap:4px}
@@ -534,7 +543,7 @@ h3{font-size:clamp(1.35rem,2.1vw,1.6rem)}
 .hero .sub,.sub{font-family:var(--f-ui);font-weight:500;font-size:clamp(1.0625rem,1.6vw,1.25rem)}
 b,strong{font-family:var(--f-ui);font-weight:600}
 .han b,.hanzi b{font-family:inherit}
-.sp-ko{--f-han:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;--f-deco:"Noto Serif KR","Noto Sans KR","AppleMyungjo","Batang",serif}
+.sp-ko{--f-han:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;--f-deco:"Gowun Batang","Nanum Myeongjo","AppleMyungjo","Batang",serif}
 .sp-ja{--f-han:"Noto Sans JP","Hiragino Sans","Yu Gothic","Meiryo",sans-serif;--f-deco:"Noto Serif JP","Noto Sans JP","Hiragino Mincho ProN","Yu Mincho",serif}
 .seal,.corner,.glyph,.spg,.spbig,.loading .han,.empty .han{font-family:var(--f-deco)!important;font-weight:600}
 .btn,.tab,.chip,.pill,.opt,.seg button,.lvl,.link,.field label,.check,th,.code{font-family:var(--f-ui)}
@@ -1596,11 +1605,36 @@ const DECO_SEL = ".glyph,.corner,.cat-h,.ach-zh,.pomo-h,.eyebrow,.han,.skh,.hwnu
 function decoStr(s, l){
   return s.replace(/[一-鿿]+/g, r => l === "ko" ? (DECO_KO[r] ?? r) : (DECO_JA[r] ?? [...r].map(c => DECO_JA_C[c] || c).join("")));
 }
+// Korean / Japanese words are longer than one Chinese glyph: shrink them until they fit their round or square frame.
+const DECO_FIT = new Set(); let decoFitRaf = 0;
+function decoFitQ(el){ DECO_FIT.add(el); if (!decoFitRaf) decoFitRaf = requestAnimationFrame(decoFitRun); }
+function decoFitRun(){
+  decoFitRaf = 0; const els = [...DECO_FIT]; DECO_FIT.clear();
+  for (const el of els){
+    if (!el.isConnected) continue;
+    const txt = el.textContent.trim(); if ([...txt].length < 2) continue;
+    const cs = getComputedStyle(el), inline = cs.display === "inline", par = el.parentElement; if (!par) continue;
+    const pcs = getComputedStyle(par), small = par.clientWidth > 0 && par.clientWidth < 150;
+    let box = null, bw = 0, bh = 0;
+    if (small || inline){ box = par; bw = par.clientWidth - parseFloat(pcs.paddingLeft) - parseFloat(pcs.paddingRight); bh = par.clientHeight - parseFloat(pcs.paddingTop) - parseFloat(pcs.paddingBottom);
+      if (/50%/.test(pcs.borderTopLeftRadius) || parseFloat(pcs.borderTopLeftRadius) >= par.clientWidth / 2 - 1){ bw *= .78; bh *= .78; } }
+    else { box = el; bw = el.clientWidth; bh = el.clientHeight; }
+    if (bw <= 0) continue;
+    const long = [...txt.replace(/\s/g, "")].length > 3 && /\s/.test(txt);
+    if (box === el && !small) continue;
+    el.style.whiteSpace = long ? "normal" : "nowrap"; if (long && small){ el.style.lineHeight = "1.05"; el.style.textAlign = "center"; }
+    let fs = parseFloat(cs.fontSize), k = 0;
+    const over = () => { const r = el.getBoundingClientRect();
+      if (box === el) return el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1;
+      return r.width > bw + 1 || (small && bh > 0 && r.height > bh + 1) || (inline && !long && el.getClientRects().length > 1); };
+    while (k++ < 16 && over() && fs > 7){ fs *= .88; el.style.fontSize = fs + "px"; }
+  }
+}
 function decoFix(root){
   const l = LANG_CUR; if ((l !== "ko" && l !== "ja") || !root) return;
   if (root.nodeType === 3){ const p = root.parentElement; if (!p || !/[一-鿿]/.test(root.nodeValue) || p.closest("script,style,textarea,.noi18n,[lang=zh],[data-deco=off]")) return;
     if (l === "ja" && !p.closest(DECO_SEL)) return;
-    const t = decoStr(root.nodeValue, l); if (t !== root.nodeValue) root.nodeValue = t; return; }
+    const t = decoStr(root.nodeValue, l); if (t !== root.nodeValue){ root.nodeValue = t; if (p.tagName !== "OPTION" && p.closest(DECO_SEL)) decoFitQ(p); } return; }
   if (root.nodeType !== 1 || root.matches?.("script,style,textarea")) return;
   for (let c = root.firstChild; c; c = c.nextSibling) decoFix(c);
 }
@@ -1766,14 +1800,15 @@ function bellSync(){
     <div class="bl">${items.length ? items.map(row).join("") : `<div class="be"><span class="han">静</span>Поки що нічого немає</div>`}</div></div>`;
   if (window.innerWidth <= 560){ const pop = el.querySelector(".bellpop"), hb = document.querySelector("header.band")?.getBoundingClientRect(); if (pop && hb){ pop.style.top = Math.max(8, hb.bottom + 8) + "px"; pop.style.maxHeight = `calc(100vh - ${Math.max(8, hb.bottom + 8) + 16}px)`; } }
 }
-document.addEventListener("click", e => { if (S.bellOpen && !e.target.closest?.("#bell")){ S.bellOpen = false; bellSync(); } });
+document.addEventListener("click", e => { if (S.bellOpen && !e.target.closest?.("#bell")){ S.bellOpen = false; bellSync(); } if (S.spMenu && !e.target.closest?.(".spwrap")){ S.spMenu = false; renderWho(); } });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && S.spMenu){ S.spMenu = false; renderWho(); } });
 document.addEventListener("keydown", e => { if (e.key === "Escape" && S.bellOpen){ S.bellOpen = false; bellSync(); } });
 function renderWho(){
   pySync(); langSync(); brandSync(); bellSync();
   const w = $("#who");
   if (S.phase !== "ready"){ w.innerHTML = ""; return; }
   if (S.testAs){ w.innerHTML = `<button class="btn sm gold" data-act="exitTest">Вийти з режиму студента</button>`; return; }
-  if (S.isTeacher){ w.innerHTML = `${adminSpaces() && S.space ? `<button class="chip spsw" data-act="spaces" title="Змінити мовний простір">${SPACES[S.space].seal}<span class="spl"> Мови</span> ▾</button>` : ""}<span class="pill gold">${ROLE_UK[S.role]}</span>`; return; }
+  if (S.isTeacher){ w.innerHTML = `${adminSpaces() && S.space ? `<span class="spwrap"><button class="chip spsw" data-act="spMenu" aria-haspopup="menu" aria-expanded="${!!S.spMenu}" title="Змінити мовний простір"><span class="noi18n">${SPACES[S.space].seal}</span><span class="spl"> Мови</span> ▾</button>${S.spMenu ? `<div class="spmenu koraw" role="menu">${Object.entries(SPACES).map(([id, sp]) => `<button role="menuitem" class="spitem ${id === S.space ? "on" : ""}" data-act="space" data-arg="${id}"><span class="spseal noi18n">${sp.seal}</span><span><b>${sp.name}</b><small>${sp.ready ? sp.levels : "скоро"}</small></span>${id === S.space ? "<span class=\"spcheck\">✓</span>" : ""}</button>`).join("")}<button role="menuitem" class="spitem all" data-act="spaces"><span class="spseal">☰</span><span><b>Усі мови</b><small>сторінка вибору</small></span></button></div>` : ""}</span>` : ""}<span class="pill gold">${ROLE_UK[S.role]}</span>`; return; }
   if (S.me){ const c = classOf(S.me); w.innerHTML = `<span style="min-width:0;display:flex;flex-direction:column;align-items:flex-end"><strong>${esc(dispName(S.me))}</strong><span>${esc(c ? c.name : "Без групи")}</span></span>`; return; }
   w.innerHTML = "";
 }
@@ -5625,8 +5660,9 @@ const ACT = {
     if (k === "ctl"){ S.view = {name: "hwctl"}; render(); window.scrollTo(0, 0); return; }
     S.view = {name: "home"}; render(); window.scrollTo(0, 0);
   },
-  spaces(){ S.gram = null; S.space = ""; try { localStorage.setItem("asianish.space", ""); } catch(e){} S.view = {name: "home"}; S.modal = null; render(); window.scrollTo(0, 0); },
-  space(id){ if (!SPACES[id]) return; S.gram = null; S.space = id; try { localStorage.setItem("asianish.space", id); } catch(e){} S.view = {name: "home"}; S.modal = null; render(); window.scrollTo(0, 0); },
+  spMenu(){ S.spMenu = !S.spMenu; renderWho(); },
+  spaces(){ S.spMenu = false; S.gram = null; S.space = ""; try { localStorage.setItem("asianish.space", ""); } catch(e){} S.view = {name: "home"}; S.modal = null; render(); window.scrollTo(0, 0); },
+  space(id){ if (!SPACES[id]) return; S.spMenu = false; S.gram = null; S.space = id; try { localStorage.setItem("asianish.space", id); } catch(e){} S.view = {name: "home"}; S.modal = null; render(); window.scrollTo(0, 0); },
   openTeacher(id){ S.gram = null; S.view = {name: "teacher", tid: id}; render(); window.scrollTo(0, 0); },
   newTeacher(){ S.modal = {kind: "teacher", id: null}; renderModal(); },
   editTeacher(id){ S.modal = {kind: "teacher", id}; renderModal(); },
