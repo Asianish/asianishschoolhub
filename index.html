@@ -126,7 +126,7 @@ main{padding-block:28px 64px}
 .sh{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
 
 /* tabs */
-.tabs{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--line);scrollbar-width:none;margin-inline:-4px;padding-inline:4px}
+.tabs{display:flex;flex-wrap:wrap;row-gap:0;gap:4px;overflow-x:auto;border-bottom:1px solid var(--line);scrollbar-width:none;margin-inline:-4px;padding-inline:4px}
 .tabs::-webkit-scrollbar{display:none}
 .tab{background:none;border:0;padding:12px 14px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;margin-bottom:-1px}
 .tab[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--gold)}
@@ -582,7 +582,7 @@ b,strong{font-family:var(--f-ui);font-weight:600}
   .pomo{padding:6px 8px 8px 10px;gap:6px;border-radius:14px}.pomo-h{font-size:1.2rem}.pomo-t{font-size:1.12rem}.pomo-m{min-width:60px}.pomo .iconbtn{width:30px;height:30px}.pomo-p{padding:3px 4px;font-size:.75rem}
   .freebar{padding:8px 12px;gap:10px}.freebar .fb-t .small{display:none}.fb-ic{width:38px;height:32px}
   .hwnudge{padding:9px 12px;font-size:.92rem}
-  .tabs{-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent)}
+  .tabs{flex-wrap:nowrap;-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent)}
   .tab{padding:10px 11px;font-size:.95rem}
   .stack{gap:16px}
   .hero-stats{display:grid!important;grid-template-columns:1fr 1fr;gap:12px 16px;width:100%}
@@ -1356,7 +1356,9 @@ const lessonsSorted = () => Object.values(S.lessons).filter(l => lvLang(l.hsk) =
 const grammarSorted = () => Object.values(S.grammar).filter(g => lvLang(g.hsk) === LANG_CUR).sort((a, b) => lvIdx(a.hsk) - lvIdx(b.hsk) || (a.order || 0) - (b.order || 0));
 const classesSorted = () => Object.values(S.classes).filter(c => clsLang(c) === LANG_CUR).sort((a, b) => (a.order || 0) - (b.order || 0) || String(a.name).localeCompare(b.name, "uk"));
 const classOf = st => st && st.classId ? S.classes[st.classId] : null;
-const courseOf = (st, cls) => cls?.course || (st?.level && Object.values(LVSETS).some(a => a.includes(st.level)) ? st.level : HSK[0]);
+// A teacher can set an individual level for a student (st.lvo); it overrides the group level within the same language.
+const lvoOk = (st, cls) => { const o = st?.lvo; return o && Object.values(LVSETS).some(a => a.includes(o)) && (!cls || lvLang(o) === lvLang(cls.course || "HSK1")) ? o : ""; };
+const courseOf = (st, cls) => lvoOk(st, cls) || cls?.course || (st?.level && Object.values(LVSETS).some(a => a.includes(st.level)) ? st.level : HSK[0]);
 const clsLang = c => lvLang(c?.course || "HSK1");
 const stLang = st => { const c = st?.classId ? S.classes[st.classId] : null; return c ? clsLang(c) : lvLang(st?.level || "HSK1"); };
 const levelsUpTo = course => HSK.slice(0, lvIdx(course) + 1);
@@ -1636,6 +1638,7 @@ function syncMe(){
     if (!S.me || S.store !== "remote"){ S.me = clone(remote); S.store = "remote"; return; }
     if ((remote.rev || 0) > (S.me.rev || 0) && !saving) S.me = clone(remote);
     if (remote.assignAt && remote.assignAt !== S.me.assignAt){ S.me.classId = remote.classId; S.me.assignAt = remote.assignAt; }
+    if (remote.lvoAt && remote.lvoAt !== S.me.lvoAt){ S.me.lvo = remote.lvo || ""; if (remote.level) S.me.level = remote.level; S.me.lvoAt = remote.lvoAt; S.level = null; }
     return;
   }
   if (!S.me){ const loc = lsGet(localKey()); if (loc){ S.me = loc; S.store = "local"; } }
@@ -2133,9 +2136,11 @@ function studentTable(entries, tid){
       <td class="n">${s.acc == null ? "—" : s.acc + "%"}</td><td class="n">${s.exDone}</td><td class="n">${s.streak}</td>
       <td class="n">${s.points}</td><td class="n">${w.pts}</td><td class="n">${Object.keys(st.ach || {}).length}</td><td>${st.updatedAt ? fmtDate(dstr(new Date(st.updatedAt))) : "—"}</td>
       <td><select class="input" style="min-height:34px;padding:4px 8px;width:auto" data-chg="assign" data-id="${esc(id)}" aria-label="Група студента">${opts(st.classId)}</select></td>
+      <td>${(() => { const cls = classOf(st), cur = lvoOk(st, cls), lv = LVSETS[cls ? clsLang(cls) : stLang(st)] || HSK;
+        return `<select class="input" style="min-height:34px;padding:4px 8px;width:auto" data-chg="stlevel" data-id="${esc(id)}" aria-label="Рівень студента">${cls ? `<option value="" ${cur ? "" : "selected"}>як у групі (${esc(lvName(cls.course || HSK[0]))})</option>` : ""}${lv.map(h => `<option value="${h}" ${h === (cur || (!cls ? st.level : "")) ? "selected" : ""}>${lvName(h)}</option>`).join("")}</select>`; })()}</td>
       <td><button class="btn sm ${S.delStu === id ? "danger" : "ghost"}" data-act="delStu" data-arg="${esc(id)}" title="Видалити профіль студента">${S.delStu === id ? "Точно видалити?" : "Видалити"}</button></td></tr>`;
   }).join("");
-  return `<div class="tablewrap"><table><thead><tr><th>Студент</th><th class="n">Опановано</th><th class="n">Повторити</th><th class="n">Вчить</th><th class="n">Граматика</th><th class="n">Точність</th><th class="n">Вправи</th><th class="n">Серія</th><th class="n">Бали</th><th class="n">Тиждень</th><th class="n">Нагороди</th><th>Активність</th><th>Група</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  return `<div class="tablewrap"><table><thead><tr><th>Студент</th><th class="n">Опановано</th><th class="n">Повторити</th><th class="n">Вчить</th><th class="n">Граматика</th><th class="n">Точність</th><th class="n">Вправи</th><th class="n">Серія</th><th class="n">Бали</th><th class="n">Тиждень</th><th class="n">Нагороди</th><th>Активність</th><th>Група</th><th>Рівень</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 // =====================================================================
@@ -2531,7 +2536,7 @@ function classSettings(c){
       <div class="field" style="grid-column:1/-1"><label for="cs-teacher">Викладач</label>${S.role === "admin"
         ? `<select class="input" id="cs-teacher" name="teacherId"><option value="">— без викладача —</option>${teachersSorted().map(t => `<option value="${esc(t.id)}" ${t.id === c.teacherId ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select><span class="hint">Учні групи потраплять у рейтинг цього викладача.</span>`
         : `<input class="input" value="${esc(S.teachers[c.teacherId]?.name || "—")}" disabled><span class="hint">Передати групу іншому викладачу може адміністраторка.</span>`}</div>
-      <div class="field"><label for="cs-course">Поточний рівень групи</label><select class="input" id="cs-course" name="course">${HSK.map(h => `<option value="${h}" ${h === (c.course || HSK[0]) ? "selected" : ""}>${lvName(h)}</option>`).join("")}</select><span class="hint">Студенти бачать цей рівень і всі нижчі.</span></div>
+      <div class="field"><label for="cs-course">${c.kind === "individual" ? "Поточний рівень учня" : "Поточний рівень групи"}</label><select class="input" id="cs-course" name="course">${HSK.map(h => `<option value="${h}" ${h === (c.course || HSK[0]) ? "selected" : ""}>${lvName(h)}</option>`).join("")}</select><span class="hint">Студенти бачать цей рівень і всі нижчі.</span></div>
       <div class="field"><label>Код для входу</label><div class="row"><span class="code" style="font-size:1.1rem">${esc(c.code)}</span><button type="button" class="btn sm" data-act="regenCode">Новий код</button></div></div>
     </div>
     <div class="row"><button class="btn primary" type="submit">Зберегти</button><span style="flex:1"></span><button type="button" class="btn danger" data-act="askDelClass">Видалити</button></div>
@@ -6092,6 +6097,9 @@ document.addEventListener("change", async e => {
   if (el.dataset.ef === "hidden" && S.edit) S.edit.hidden = el.checked;
   if (el.dataset.ef === "hsk" && S.edit) S.edit.hsk = el.value;
   const c = el.dataset.chg; if (!c) return;
+  if (c === "stlevel"){ const id = el.dataset.id, st = S.students[id], v = el.value, upd = {lvo: v, lvoAt: Date.now()};
+    if (!classOf(st) && v) upd.level = v;
+    try { await S.db.doc("students/" + id).update(upd); Object.assign(st, upd); toast(v ? "Рівень студента: " + lvName(v) : "Рівень — як у групі"); render(); } catch(err){ toast("Не вдалося змінити рівень"); } }
   if (c === "assign"){ const id = el.dataset.id; try { await S.db.doc("students/" + id).update({classId: el.value, assignAt: Date.now()}); toast("Групу змінено"); } catch(err){ toast("Не вдалося змінити групу"); } }
   else if (c === "cskind"){ const a = document.getElementById("cs-age"); if (a) a.innerHTML = ageOpts(el.value, a.value); }
   else if (c === "momonth"){ if (S.medit){ moOpen(S.medit.sid, el.value); render(); } }
