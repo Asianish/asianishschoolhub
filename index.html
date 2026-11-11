@@ -374,8 +374,8 @@ textarea.input{min-height:110px;resize:vertical;font-family:var(--f-body)}
 .mk.g{background:var(--gold);color:#23483F}.mk.s{background:var(--silver);color:#fff}.mk.b{background:var(--bronze);color:#fff}
 .ptsgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
 .ptscard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:8px}
-.ptscard .ph{display:flex;align-items:center;gap:8px;font-family:var(--f-ui);font-weight:600;font-size:1.0625rem}
-.ptscard .ph .han{display:grid;place-items:center;width:30px;height:30px;border-radius:8px;background:var(--gold-soft);color:var(--gold-ink);font-size:1rem}
+.ptscard .pthead{display:flex;align-items:center;gap:8px;font-family:var(--f-ui);font-weight:600;font-size:1.0625rem}
+.ptscard .pthead .han{display:grid;place-items:center;min-width:30px;height:30px;padding:0 6px;border-radius:8px;background:var(--gold-soft);color:var(--gold-ink);font-size:1rem}
 .ptscard ul{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:column;gap:10px}
 .ptscard li{display:grid;grid-template-columns:48px 1fr;gap:10px;align-items:start}
 .ptscard li>span:last-child{display:flex;flex-direction:column;gap:2px}
@@ -1362,14 +1362,14 @@ leaguesFill();
 const leagueOf = st => Math.min(5, lvIdx(courseOf(st, classOf(st))) + 1);
 const isPair = c => !!c && c.kind !== "individual" && /пара/i.test(c.name || "");
 // Ranking: all students by default; tid narrows to one teacher's students, classId to one group, lg to one league.
-function rankList(p, classId, tid, lg){
+function rankList(p, classId, tid, lg, school){
   return Object.entries(S.students)
     .filter(([id]) => !isStaffId(id))
-    .filter(([, st]) => stLang(st) === LANG_CUR)
+    .filter(([, st]) => school || stLang(st) === LANG_CUR)
     .filter(([, st]) => !lg || leagueOf(st) === lg)
     .filter(([, st]) => tid == null || studentTid(st) === tid)
     .filter(([, st]) => !classId || st.classId === classId)
-    .map(([id, st]) => ({id, name: dispName(st), cls: st.classId, ...rankRow(st, p), streak: streak(st)}))
+    .map(([id, st]) => ({id, name: dispName(st), cls: st.classId, lang: stLang(st), ...rankRow(st, p), streak: streak(st)}))
     .filter(r => r.pts > 0)
     .sort((a, b) => b.pts - a.pts || b.m - a.m || a.name.localeCompare(b.name, "uk"));
 }
@@ -3346,9 +3346,9 @@ function schoolPodiums(){
   const key = Object.keys(S.students).length + ":" + today();
   if (_podCache && _podCache.key === key) return _podCache.v;
   const byMonth = {};
-  for (const [id, st] of Object.entries(S.students)) for (const [d, v] of Object.entries(st.log || {})){ const m = monthOf(d); if (!v?.p) continue; ((byMonth[m] = byMonth[m] || {})[id] = (byMonth[m][id] || 0) + v.p); }
+  for (const [id, st] of Object.entries(S.students)){ if (isStaffId(id)) continue; const lg = stLang(st); for (const [d, v] of Object.entries(st.log || {})){ const m = monthOf(d); if (!v?.p) continue; const k = m + "|" + lg; ((byMonth[k] = byMonth[k] || {})[id] = (byMonth[k][id] || 0) + v.p); } }
   const cur = curMonth(), v = {};
-  for (const [m, pts] of Object.entries(byMonth)){ if (m >= cur) continue; v[m] = Object.entries(pts).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, 3).map(x => x[0]); }
+  for (const [k, pts] of Object.entries(byMonth)){ const m = k.split("|")[0]; if (m >= cur) continue; const mk = k; v[mk] = Object.entries(pts).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, 3).map(x => x[0]); }
   _podCache = {key, v}; return v;
 }
 // «Викладач місяця»: the same formula for everybody, per student so small classes are not at a disadvantage
@@ -4569,7 +4569,8 @@ function exMenu(ctx){
 }
 
 // ---- main view
-const EX_NOPY_TYPES = new Set(["pinyin", "dict", "sound", "listen", "adet", "lrec"]), EX_NOPY_SHOW = new Set(["py", "han2py", "sound", "listen", "adet"]);
+// «Аудіювання»: варіанти відповідей показуються з піньїнем (вимикається загальним перемикачем).
+const EX_NOPY_TYPES = new Set(["pinyin", "dict", "sound", "adet", "lrec"]), EX_NOPY_SHOW = new Set(["py", "han2py", "sound", "adet"]);
 function exView(){
   const html = exView0(), e = S.ex, ctx = currentCtx();
   if (!e || e.key !== ctx.key || !e.running || e.finished) return html;
@@ -5257,10 +5258,10 @@ function gramRecord(i, ok){
 const BEST_N = 7;
 let _bestCache = null;
 function bestOfMonth(m){
-  const key = m + ":" + Object.keys(S.students).length + ":" + today();
+  const key = LANG_CUR + ":" + m + ":" + Object.keys(S.students).length + ":" + today();
   _bestCache = _bestCache && _bestCache.day === today() ? _bestCache : {day: today(), v: {}};
   if (_bestCache.v[key]) return _bestCache.v[key];
-  const out = Object.entries(S.students).map(([id, st]) => { let pts = 0; for (const [d, v] of Object.entries(st.log || {})) if (d.slice(0, 7) === m) pts += v.p || 0; return {id, name: dispName(st), pts}; })
+  const out = Object.entries(S.students).filter(([id, st]) => !isStaffId(id) && stLang(st) === LANG_CUR).map(([id, st]) => { let pts = 0; for (const [d, v] of Object.entries(st.log || {})) if (d.slice(0, 7) === m) pts += v.p || 0; return {id, name: dispName(st), pts}; })
     .filter(x => x.pts > 0).sort((a, b) => b.pts - a.pts || a.name.localeCompare(b.name, "uk")).slice(0, BEST_N);
   return (_bestCache.v[key] = out);
 }
@@ -5283,17 +5284,17 @@ function pointsRulesHtml(){
   const row = (pts, what, note) => `<li><span class="pts">${pts}</span><span><b>${what}</b>${note ? `<span class="small muted">${note}</span>` : ""}</span></li>`;
   return `<section class="stack" style="gap:14px"><div class="sh" style="margin:0"><h3>Як нараховуються бали</h3><span class="small muted">Однаково для всіх студентів</span></div>
     <div class="ptsgrid">
-      <div class="ptscard"><div class="ph"><span class="han">卡</span>Картки</div><p class="small muted">Усі колоди: рівні HSK, «Лексика з уроків», «Банка слів»</p><ul>
+      <div class="ptscard"><div class="pthead"><span class="han">卡</span>Картки</div><p class="small muted">Усі колоди: рівні HSK, «Лексика з уроків», «Банка слів»</p><ul>
         ${row("+" + PTS.know, "«Знаю»", "нове слово або слово, якому настав час повторення")}
         ${row("+" + PTS.again, "«Повторити»", "чесно позначили, що треба ще раз")}
         ${row("+" + PTS.master, "Слово опановано", "згадали його у " + MASTER + " різні дні — бонус один раз за слово")}</ul></div>
-      <div class="ptscard"><div class="ph"><span class="han">练</span>Вправи зі словами</div><p class="small muted">Пари, тест, пропуски, аудіювання, піньїнь, «Мої помилки»</p><ul>
+      <div class="ptscard"><div class="pthead"><span class="han">练</span>Вправи зі словами</div><p class="small muted">Пари, тест, пропуски, аудіювання, піньїнь, «Мої помилки»</p><ul>
         ${row("+" + PTS.correct, "Правильна відповідь", "кожне слово в кожному типі вправи — раз на день")}
         ${row("+" + PTS.perfect, "Вправа без помилок", "від " + PERFECT_MIN + " питань, раз на день для кожного типу")}</ul></div>
-      <div class="ptscard"><div class="ph"><span class="han">语</span>Граматика</div><p class="small muted">Вправи наприкінці кожної теми</p><ul>
+      <div class="ptscard"><div class="pthead"><span class="han">语</span>Граматика</div><p class="small muted">Вправи наприкінці кожної теми</p><ul>
         ${row("+" + PTS.gram, "Правильна відповідь", "кожне завдання — раз на день")}
         ${row("+" + PTS.gramDone, "Тема на 100%", "уперше всі відповіді правильні — бонус один раз за тему")}</ul></div>
-      <div class="ptscard"><div class="ph"><span class="han">日</span>Щоденна норма</div><p class="small muted">Будь-які картки, вправи чи граматика</p><ul>
+      <div class="ptscard"><div class="pthead"><span class="han">日</span>Щоденна норма</div><p class="small muted">Будь-які картки, вправи чи граматика</p><ul>
         ${row("+" + PTS.daily, DAILY_GOAL + " навчальних дій за день", "раз на день; серія днів показує, скільки днів поспіль ви вчилися")}</ul></div>
     </div>
     <div class="note"><span>⚖️</span><span><b>Чесні правила.</b> Повторне перегортання картки чи повтор тієї самої вправи бали не додає. Власні слова й слова зі словника в «Банці слів» допомагають вчитися, але балів не дають. Рейтинг за тиждень і місяць рахує лише бали, зароблені в цей період. У рейтингу видно тільки ім'я або псевдонім.</span></div>
@@ -5316,30 +5317,30 @@ function rankView(teacher, classId){
   if (teacher && classId && r.scopeInit !== classId){ r.scopeInit = classId; scope = r.scope = classId; }
   const myCls0 = S.classes[classId], solo = !myCls0 || myCls0.kind === "individual";
   const myLg = !teacher && S.me ? leagueOf(S.me) : null;
-  if (!teacher) scope = scope === "lg" && myLg ? "lg:" + myLg : /^lg:[1-5]$/.test(scope) ? scope : allowGroup && classId && !solo && scope === "group" ? classId : "all";
+  if (!teacher) scope = scope === "school" ? "school" : scope === "lg" && myLg ? "lg:" + myLg : /^lg:[1-5]$/.test(scope) ? scope : allowGroup && classId && !solo && scope === "group" ? classId : "all";
   const admin = S.role === "admin", myT = myTeacherId();
   const myCls = admin ? classesSorted() : classesOf(myT);
-  if (teacher && scope !== "all" && !scope.startsWith("t:") && !scope.startsWith("lg:") && !myCls.some(c => c.id === scope)) scope = r.scope = "all";
+  if (teacher && scope !== "all" && scope !== "school" && !scope.startsWith("t:") && !scope.startsWith("lg:") && !myCls.some(c => c.id === scope)) scope = r.scope = "all";
   const tid = scope.startsWith("t:") ? scope.slice(2) : null, lg = scope.startsWith("lg:") ? Number(scope.slice(3)) : 0;
-  const cid = scope === "all" || tid != null || lg ? "" : scope;
-  const list = rankList(r.period, cid, tid, lg), top = list.slice(0, 10);
+  const school = scope === "school", cid = scope === "all" || school || tid != null || lg ? "" : scope;
+  const list = rankList(r.period, cid, tid, lg, school), top = list.slice(0, 10);
   const meIdx = !teacher && S.store === "remote" ? list.findIndex(x => x.id === S.uid) : -1;
   const periods = [["all","За весь час"],["month","Цей місяць"],["week","Цей тиждень"]];
   let scopeCtl = "";
-  if (teacher) scopeCtl = `<select class="input" style="width:auto;min-height:38px" data-chg="rankscope" aria-label="Кого показати"><option value="all" ${scope === "all" ? "selected" : ""}>${SPACES[LANG_CUR].seal} Уся ${LNAME()}а (усі учні)</option>
+  if (teacher) scopeCtl = `<select class="input" style="width:auto;min-height:38px" data-chg="rankscope" aria-label="Кого показати"><option value="all" ${scope === "all" ? "selected" : ""}>${SPACES[LANG_CUR].seal} Уся ${LNAME()}а (усі учні)</option><option value="school" ${scope === "school" ? "selected" : ""}>Уся школа (усі мови)</option>
     ${admin ? teachersSorted().map(t => `<option value="t:${esc(t.id)}" ${scope === "t:" + t.id ? "selected" : ""}>Учні: ${esc(t.name)}</option>`).join("") : myT ? `<option value="t:${esc(myT)}" ${scope === "t:" + myT ? "selected" : ""}>Мої учні</option>` : ""}
     <optgroup label="Ліги за рівнем">${Object.entries(LEAGUES).map(([k, L]) => `<option value="lg:${k}" ${scope === "lg:" + k ? "selected" : ""}>Ліга ${L.name}${k === "5" ? "+" : ""}</option>`).join("")}</optgroup>
     ${myCls.map(c => `<option value="${esc(c.id)}" ${scope === c.id ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select>`;
-  else scopeCtl = `<div class="stack" style="gap:8px"><div class="chips"><button class="chip" aria-pressed="${scope === "all"}" data-act="rankScope" data-arg="all">${SPACES[LANG_CUR].seal} Уся ${LNAME()}а</button>${allowGroup && classId && !solo ? `<button class="chip" aria-pressed="${!!cid}" data-act="rankScope" data-arg="group">${isPair(myCls0) ? "Моя пара" : "Моя група"}</button>` : ""}</div>
+  else scopeCtl = `<div class="stack" style="gap:8px"><div class="chips"><button class="chip" aria-pressed="${scope === "all"}" data-act="rankScope" data-arg="all">${SPACES[LANG_CUR].seal} Уся ${LNAME()}а</button><button class="chip" aria-pressed="${scope === "school"}" data-act="rankScope" data-arg="school">Уся школа</button>${allowGroup && classId && !solo ? `<button class="chip" aria-pressed="${!!cid}" data-act="rankScope" data-arg="group">${isPair(myCls0) ? "Моя пара" : "Моя група"}</button>` : ""}</div>
     <div class="chips lgchips" role="group" aria-label="Ліги за рівнем"><span class="small muted">Ліги:</span>${Object.entries(LEAGUES).map(([k, L]) => `<button class="chip" aria-pressed="${lg === Number(k)}" data-act="rankScope" data-arg="lg:${k}">${L.name}${Number(k) === myLg ? " ★" : ""}</button>`).join("")}</div></div>`;
   const podium = top.slice(0, 3).map((x, i) => `<div class="pod p${i + 1}"><span class="medal">${i + 1}</span><span class="nm">${esc(x.name)}</span><span class="pts num">${x.pts}</span><span class="small muted">балів</span></div>`).join("");
   const mk = i => i === 0 ? `<span class="mk g">1</span>` : i === 1 ? `<span class="mk s">2</span>` : i === 2 ? `<span class="mk b">3</span>` : `<span class="num" style="padding-left:8px">${i + 1}</span>`;
-  const row = (x, i) => `<tr class="${x.id === S.uid && !teacher ? "me" : ""}"><td>${mk(i)}</td><td><b>${esc(x.name)}</b>${x.id === S.uid && !teacher ? ` <span class="pill gold" data-en="you">ви</span>` : ""}</td><td class="n">${x.m}</td><td class="n">${x.c}</td><td class="n">${x.streak}</td><td class="n"><b>${x.pts}</b></td></tr>`;
+  const row = (x, i) => `<tr class="${x.id === S.uid && !teacher ? "me" : ""}"><td>${mk(i)}</td><td><b>${esc(x.name)}</b>${school ? ` <span class="pill koraw noi18n">${esc(SPACES[x.lang]?.name || "")}</span>` : ""}${x.id === S.uid && !teacher ? ` <span class="pill gold" data-en="you">ви</span>` : ""}</td><td class="n">${x.m}</td><td class="n">${x.c}</td><td class="n">${x.streak}</td><td class="n"><b>${x.pts}</b></td></tr>`;
   const table = top.length ? `<div class="tablewrap"><table><thead><tr><th>Місце</th><th>Учасник</th><th class="n">${r.period === "all" ? "Опановано" : "Опановано за період"}</th><th class="n">Правильні відповіді</th><th class="n">Серія днів</th><th class="n">Бали</th></tr></thead><tbody>${top.map(row).join("")}${meIdx >= 10 ? `<tr><td colspan="6" class="small muted" style="text-align:center">…</td></tr>${row(list[meIdx], meIdx)}` : ""}</tbody></table></div>` : emptyBox("榜", "За цей період ще немає результатів", "Рейтинг заповнюється після перших повторень карток і вправ.");
   const mine = teacher ? "" : S.store === "test" ? `<div class="note info"><span>🧪</span><span>Тестовий режим: вас немає в рейтингу, ви бачите справжній рейтинг студентів.</span></div>` : S.store !== "remote" ? `<div class="note"><span>📱</span><span>Ваш прогрес зберігається лише на цьому пристрої, тому вас немає в рейтингу.</span></div>`
-    : meIdx >= 0 ? `<div class="note info"><span>⭐</span><span>Ваше місце ${lg ? `у лізі ${LEAGUES[lg].name}` : cid ? (isPair(S.classes[cid]) ? "у парі" : "у групі") : "серед усіх учнів китайської мови"}: <b>${meIdx + 1}</b> з ${list.length}.</span></div>` : `<div class="note info"><span>⭐</span><span>Отримайте перші бали, щоб з'явитися в рейтингу.</span></div>`;
-  return `<div><div class="eyebrow">${SPACES[LANG_CUR].native} · 排行榜</div><h2 style="margin:2px 0 0">Рейтинг учнів з ${LNAME()}ої мови</h2></div>
-    <p class="small muted">${lg ? `Ліга <b>${LEAGUES[lg].name}</b> з ${LNAME()}ої мови: усі учні рівня ${lg === 5 ? lvName(HSK[4]) + " і вище" : LEAGUES[lg].name} від усіх викладачів${lg === myLg ? " — це ваша ліга ★" : ""}.` : cid ? `Рейтинг ${isPair(S.classes[cid]) ? "пари" : "групи"} <b>${esc(S.classes[cid]?.name || "")}</b>.` : tid ? `Учні викладача <b>${esc(S.teachers[tid]?.name || "")}</b>.` : "<b>Рейтинг з " + LNAME() + "ої мови</b>: усі учні " + LNAME() + "ої Asianish School — усіх викладачів, груп, пар і індивідуальні."} Показуються лише ім'я або псевдонім і бали — без жодних інших даних.</p>
+    : meIdx >= 0 ? `<div class="note info"><span>⭐</span><span>Ваше місце ${lg ? `у лізі ${LEAGUES[lg].name}` : school ? "серед усіх учнів школи" : cid ? (isPair(S.classes[cid]) ? "у парі" : "у групі") : `серед усіх учнів ${LNAME()}ої мови`}: <b>${meIdx + 1}</b> з ${list.length}.</span></div>` : `<div class="note info"><span>⭐</span><span>Отримайте перші бали, щоб з'явитися в рейтингу.</span></div>`;
+  return `<div><div class="eyebrow">${SPACES[LANG_CUR].native} · 排行榜</div><h2 style="margin:2px 0 0">${school ? "Рейтинг учнів школи" : `Рейтинг учнів з ${LNAME()}ої мови`}</h2></div>
+    <p class="small muted">${lg ? `Ліга <b>${LEAGUES[lg].name}</b> з ${LNAME()}ої мови: усі учні рівня ${lg === 5 ? lvName(HSK[4]) + " і вище" : LEAGUES[lg].name} від усіх викладачів${lg === myLg ? " — це ваша ліга ★" : ""}.` : cid ? `Рейтинг ${isPair(S.classes[cid]) ? "пари" : "групи"} <b>${esc(S.classes[cid]?.name || "")}</b>.` : tid ? `Учні викладача <b>${esc(S.teachers[tid]?.name || "")}</b>.` : school ? `<span class="koraw"><b>Рейтинг усієї школи</b>: учні всіх мов — китайської, корейської та японської, усіх викладачів і рівнів.</span>` : "<b>Рейтинг з " + LNAME() + "ої мови</b>: усі учні " + LNAME() + "ої Asianish School — усіх викладачів, груп, пар і індивідуальні."} Показуються лише ім'я або псевдонім і бали — без жодних інших даних.</p>
     <div class="spread"><div class="chips">${periods.map(([id, n]) => `<button class="chip" aria-pressed="${r.period === id}" data-act="period" data-arg="${id}">${n}</button>`).join("")}</div>${scopeCtl}</div>
     ${mine}
     ${scope === "all" ? bestHtml(teacher) : ""}
