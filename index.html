@@ -1287,45 +1287,17 @@ function pickZhVoice(){
     if (best) zhVoice = best;
     let kb = null, ks = -1; for (const v of vs){ const sc = koVoiceScore(v); if (sc > ks){ ks = sc; kb = v; } } if (kb) koVoice = kb; } catch(e){}
 }
-// Online voice: used when the browser has no Chinese / Korean voice (Firefox on Windows, some tablets) or its voice stays silent.
-let ttsAudio = null, speakWD = 0;
-const TTS_SILENT = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=";
-function ttsEl(){ if (!ttsAudio){ ttsAudio = new Audio(); ttsAudio.preload = "auto"; } return ttsAudio; }
-function speakNet(text, lang){
-  const parts = String(text || "").match(/[^。！？.!?；;，,]+[。！？.!?；;，,]*/g) || [String(text || "")];
-  const chunks = []; let cur = "";
-  for (const p of parts){ if (cur && (cur + p).length > 150){ chunks.push(cur); cur = p; } else cur += p; }
-  if (cur.trim()) chunks.push(cur);
-  const a = ttsEl(); let k = 0;
-  const next = () => { if (k >= chunks.length){ a.onended = null; return; }
-    a.src = "https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=" + lang + "&q=" + encodeURIComponent(chunks[k++].trim());
-    const pr = a.play(); if (pr && pr.catch) pr.catch(() => toast("Натисніть ще раз на кнопку звуку 🔊")); };
-  a.onended = next; a.onerror = () => toast("Озвучення не вдалося. Перевірте інтернет або відкрийте сторінку в Chrome.");
-  next();
-}
 function speak(text){
-  const ko = LANG_CUR === "ko", lang = ko ? "ko" : "zh-CN";
-  clearTimeout(speakWD);
-  try { if (ttsAudio && !ttsAudio.paused) ttsAudio.pause(); } catch(e){}
-  const has = "speechSynthesis" in window && typeof SpeechSynthesisUtterance !== "undefined";
-  // Unlock the audio element inside the click (iPad / iPhone allow sound only after a tap).
-  if (!ttsAudio){ try { const a = ttsEl(); a.src = TTS_SILENT; const pr = a.play(); if (pr && pr.catch) pr.catch(() => {}); } catch(e){} }
-  if (!has){ speakNet(text, lang); return; }
   try {
+    if (!("speechSynthesis" in window)) throw 0;
+    const ko = LANG_CUR === "ko";
     if (ko ? !koVoice : !zhVoice) pickZhVoice();
-    const vv = ko ? koVoice : zhVoice, known = (speechSynthesis.getVoices() || []).length > 0;
-    if (known && !vv){ speakNet(text, lang); return; }
+    const vv = ko ? koVoice : zhVoice;
     const u = new SpeechSynthesisUtterance(text); u.lang = vv?.lang || (ko ? "ko-KR" : "zh-CN");
     u.rate = /Natural|Neural|Online|Google/i.test(vv?.name || "") ? .9 : .82;
-    if (vv) try { u.voice = vv; } catch(e){}
-    let started = false;
-    u.onstart = () => { started = true; clearTimeout(speakWD); };
-    u.onerror = e => { if (!started && e.error !== "interrupted" && e.error !== "canceled"){ clearTimeout(speakWD); speakNet(text, lang); } };
-    if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel();
-    try { speechSynthesis.resume(); } catch(e){}
-    speechSynthesis.speak(u);
-    speakWD = setTimeout(() => { if (!started && !speechSynthesis.speaking){ try { speechSynthesis.cancel(); } catch(e){} speakNet(text, lang); } }, 1600);
-  } catch(e){ speakNet(text, lang); }
+    if (vv) u.voice = vv;
+    speechSynthesis.cancel(); speechSynthesis.speak(u);
+  } catch(e){ toast("Озвучення недоступне в цьому браузері"); }
 }
 try { pickZhVoice(); speechSynthesis.addEventListener("voiceschanged", pickZhVoice); } catch(e){}
 const speakBtn = (t, label) => `<button class="iconbtn" data-act="speak" data-say="${esc(t)}" aria-label="${label || "Озвучити"}">${ICON_SPEAK}</button>`;
