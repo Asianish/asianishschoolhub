@@ -1127,7 +1127,7 @@ const INT = [0, 1, 2, 4, 8, 16, 30];   // days to the next review after reaching
 const MASTER = 3;                        // stage at which a word counts as mastered
 // Level codes carry the language: HSK1… = Chinese, KO1… = Korean (급), N5… = Japanese (JLPT).
 // HSK holds the levels of the language that is open right now (it is refilled by setLangCur).
-const LVSETS = {zh: ["HSK1","HSK2","HSK3","HSK4","HSK5","HSK6"], ko: ["KO1","KO2","KO3","KO4"], ja: ["N5","N4","N3","N2","N1"]};
+const LVSETS = {zh: ["HSK1","HSK2","HSK3","HSK4","HSK5"], ko: ["KO1","KO2","KO3","KO4"], ja: ["N5","N4","N3","N2","N1"]};
 const HSK = LVSETS.zh.slice();
 const lvLang = h => /^KO/.test(h || "") ? "ko" : /^N[1-5]$/.test(h || "") ? "ja" : "zh";
 let LANG_CUR = "zh";
@@ -1370,7 +1370,9 @@ const classesSorted = () => Object.values(S.classes).filter(c => clsLang(c) === 
 const classOf = st => st && st.classId ? S.classes[st.classId] : null;
 // A teacher can set an individual level for a student (st.lvo); it overrides the group level within the same language.
 const lvoOk = (st, cls) => { const o = st?.lvo; return o && Object.values(LVSETS).some(a => a.includes(o)) && (!cls || lvLang(o) === lvLang(cls.course || "HSK1")) ? o : ""; };
-const courseOf = (st, cls) => lvoOk(st, cls) || cls?.course || (st?.level && Object.values(LVSETS).some(a => a.includes(st.level)) ? st.level : HSK[0]);
+// Levels removed from the platform (HSK 6, 5급) fall back to the highest remaining level of the same language.
+const LV_GONE = {HSK6: "HSK5", KO5: "KO4"};
+const courseOf = (st, cls) => lvoOk(st, cls) || LV_GONE[cls?.course] || cls?.course || (st?.level && Object.values(LVSETS).some(a => a.includes(st.level)) ? st.level : LV_GONE[st?.level] || HSK[0]);
 const clsLang = c => lvLang(c?.course || "HSK1");
 const stLang = st => { const c = st?.classId ? S.classes[st.classId] : null; return c ? clsLang(c) : lvLang(st?.level || "HSK1"); };
 const levelsUpTo = course => HSK.slice(0, lvIdx(course) + 1);
@@ -1567,7 +1569,7 @@ const nameSpan = (id, fb) => id ? `<span data-uid="${esc(id)}" data-fallback="${
 const staffUI = () => S.isTeacher && !S.testAs;
 // ---------- language spaces (admin chooses; teachers and students stay in Chinese until their spaces are ready)
 const SPACES = {
-  zh: {seal: "中", wm: "CHINESE", name: "Китайська мова", native: "中文", levels: "HSK 1–6", ready: true},
+  zh: {seal: "中", wm: "CHINESE", name: "Китайська мова", native: "中文", levels: "HSK 1–5", ready: true},
   ko: {seal: "한", wm: "KOREAN", name: "Корейська мова", native: "한국어", levels: "1–4 급", ready: true},
   ja: {seal: "日", wm: "JAPANESE", name: "Японська мова", native: "日本語", levels: "JLPT N5–N1", ready: false}
 };
