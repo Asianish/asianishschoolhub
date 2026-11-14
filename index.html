@@ -4447,13 +4447,14 @@ function knRomaji(s){
 }
 
 // Romaji of a sentence written with furigana brackets; spaces mark words, so the particles は, へ, を read wa, e, o.
-const JA_PRT = {"は": "wa", "へ": "e", "を": "o"};
-const JA_PROPER = ["ウクライナ","アメリカ","イギリス","インドネシア","インド","ドイツ","ブラジル","タイ","フランス","イタリア","キーウ","マイク","アンナ","オレナ","タラス","マリア","エマ","キム","ワン","ハンス","ラジ","ペドロ","にほん","ちゅうごく","かんこく","たなか","やまだ","たろう","ゆみ","けん","とうきょう","おおさか","きょうと"];
+const JA_PRT = {"は": "wa", "へ": "e", "を": "o", "では": "dewa", "には": "niwa", "とは": "to wa", "からは": "kara wa", "までは": "made wa", "へは": "e wa", "こんにちは": "konnichiwa", "こんばんは": "konbanwa"};
+const JA_PROPER = ["ウクライナ","アメリカ","イギリス","インドネシア","インド","ドイツ","ブラジル","タイ","フランス","イタリア","キーウ","マイク","アンナ","オレナ","タラス","マリア","エマ","キム","ワン","ハンス","ラジ","ペドロ","にほん","ちゅうごく","かんこく","たなか","やまだ","たろう","ゆみちゃん","けんちゃん","とうきょう","おおさか","きょうと","ほっかいどう","ふじさん"];
 function jaSentRomaji(f){
-  const kana = String(f || "").replace(/([\u3400-\u9fff々〆ヶ]+)\[([^\]]+)\]/g, "$2").replace(/([、。？！])(?=\S)/g, "$1 ");
-  let out = kana.split(/\s+/).filter(Boolean).map(c => { const m = c.match(/^(.*?)([。、？！?!.,—]*)$/); let b = m[1]; const p = m[2];
-    let suf = ""; const sm = b.length > 2 && b.match(/(さん|ちゃん|くん|せんせい)$/); if (sm && !/^(みなさん|おかあさん|おとうさん|おばあさん|おじいさん|おにいさん|おねえさん|おこさん)$/.test(b) && JA_PROPER.some(n => b.startsWith(n))){ suf = "-" + knRomaji(sm[1]); b = b.slice(0, -sm[1].length); }
-    let r = JA_PRT[b] || knRomaji(b); if (JA_PROPER.some(n => b.startsWith(n))) r = r.charAt(0).toUpperCase() + r.slice(1);
+  const src = String(f || "").replace(/([、。？！])(?=\S)/g, "$1 ");
+  let out = src.split(/\s+/).filter(Boolean).map(c0 => { const m0 = c0.match(/^(.*?)([。、？！?!.,—]*)$/); const raw = m0[1], p = m0[2];
+    let b = raw.replace(/([\u3400-\u9fff々〆ヶ]+)\[([^\]]+)\]/g, "$2"); const prop = JA_PROPER.some(n => b.startsWith(n));
+    let suf = ""; const sm = b.length > 2 && b.match(/(さん|ちゃん|くん|せんせい)$/); if (sm && prop){ suf = "-" + knRomaji(sm[1]); b = b.slice(0, -sm[1].length); }
+    let r = (JA_PRT[raw] || knRomaji(b)); if (prop) r = r.charAt(0).toUpperCase() + r.slice(1);
     return r + suf + knRomaji(p); }).join(" ");
   out = out.replace(/\s+([.,?!])/g, "$1").replace(/\s+/g, " ").trim();
   return out.charAt(0).toUpperCase() + out.slice(1);
@@ -4484,10 +4485,10 @@ function jaFuriMap(){
   const jaLess = Object.values(S.lessons || {}).filter(l => lvLang(l.hsk) === "ja");
   for (const l of jaLess) for (const w of l.words || []){
     if (w.k) add(String(w.h || "").trim(), furiAlign(String(w.h || "").trim(), w.k));
-    for (const x of w.ex || []) if (x.f){ const seg = furiParse(x.f); add(x.zh || furiPlain(x.f), seg); for (const s of seg) if (s[1]) add(s[0], [s]); }
+    for (const x of w.ex || []) if (x.f){ const seg = furiParse(x.f); add(x.zh || furiPlain(x.f), seg); for (const s of seg) if (s[1] && s[0].length > 1) add(s[0], [s]); }
   }
   const scan = o => { if (!o || typeof o !== "object") return; if (Array.isArray(o)){ o.forEach(scan); return; }
-    if (typeof o.f === "string" && /\[/.test(o.f)){ const seg = furiParse(o.f); add(o.zh || furiPlain(o.f), seg); for (const s of seg) if (s[1]) add(s[0], [s]); }
+    if (typeof o.f === "string" && /\[/.test(o.f)){ const seg = furiParse(o.f); add(o.zh || furiPlain(o.f), seg); for (const s of seg) if (s[1] && s[0].length > 1) add(s[0], [s]); }
     for (const v of Object.values(o)) if (v && typeof v === "object") scan(v); };
   for (const g of Object.values(S.grammar || {})) if (lvLang(g.hsk) === "ja") scan(g);
   for (const k of bad) M.delete(k);
@@ -4495,7 +4496,7 @@ function jaFuriMap(){
   JAF = {M, rx: keys.length ? new RegExp(keys.join("|"), "g") : null};
   return JAF;
 }
-const FURI_SKIP = "script,style,textarea,input,select,option,ruby,rt,.nofuri,.noi18n,[contenteditable],.quiz:not(.furiok),.hgq,.knq,.who,.brand,.bellwrap,.toast";
+const FURI_SKIP = "script,style,textarea,input,select,option,ruby,rt,.nofuri,.noi18n,[contenteditable],.quiz:not(.furiok),.hgq,.knq,.who,.brand,.bellwrap,.toast,.glyph,.corner,.cat-h,.ach-zh,.pomo-h,.pomo,.skh,.hwnudge,.tg,.hwic,.mat-ic,.mf-ic,.fb-ic,.hwfic,.seg,.spbig,.spg,.seal,.eyebrow,.chip,.lvl,.pill,.lbl,.tabs,.levels,#modal,.achbox";
 function furiFix(root){
   if (LANG_CUR !== "ja" || !root) return;
   if (root.nodeType === 3){
@@ -4943,7 +4944,7 @@ function cardsView(){
     <div class="flash ${c.flipped ? "is-flipped" : ""}" data-act="flip" role="button" tabindex="0" aria-label="Перевернути картку">
       <div class="inner">
         <div class="face front" aria-hidden="${c.flipped}">${lesson}${stage}
-          <div class="hanzi"${[...String(w.h)].length > 4 ? ` style="font-size:min(${Math.max(1.8, 4.6 - ([...String(w.h)].length - 4) * .45).toFixed(2)}rem, ${(70 / [...String(w.h)].length).toFixed(1)}vw)"` : ""}>${esc(w.h)}</div><div class="py">${esc(w.p)}</div>
+          <div class="hanzi"${[...String(w.h)].length > 4 ? ` style="font-size:min(${Math.max(1.8, 4.6 - ([...String(w.h)].length - 4) * .45).toFixed(2)}rem, ${(70 / [...String(w.h)].length).toFixed(1)}vw)"` : ""}>${LANG_CUR === "ja" && w.k ? furiSegHtml(furiAlign(w.h, w.k) || [[w.h, null]]) : esc(w.h)}</div><div class="py">${esc(w.p)}</div>
           ${speakBtn(w.h)}
           <span class="tap">Натисніть на картку, щоб перевернути</span>
         </div>
