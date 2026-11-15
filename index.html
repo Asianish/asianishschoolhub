@@ -772,6 +772,9 @@ body.furioff ruby.jf rt{display:none!important}
 ruby.jf{margin:0}
 .face .hanzi ruby.jf{gap:.12em}.face .hanzi ruby.jf rt{font-size:.26em;font-weight:500;color:var(--gold-ink,#8a6a2f);background:rgba(201,161,93,.14);border-radius:999px;padding:.12em .7em;letter-spacing:.12em;line-height:1.25}ruby.jf rt{font-family:"Noto Sans JP","Hiragino Sans",sans-serif;font-size:.5em;color:var(--gold-ink);font-weight:500}
 .furiall ruby{vertical-align:middle}.furiall ruby rt{font-size:.55em}
+/* native ruby for Japanese furigana: kana and kanji share one baseline */
+ruby.jf{display:revert;vertical-align:baseline;line-height:inherit;margin:0;ruby-align:center}ruby.jf rt{display:revert;line-height:1;text-align:center;white-space:nowrap}
+.face .hanzi ruby.jf rt{padding:.12em .7em}
 .pyall{min-width:auto;padding:4px 12px 4px 5px;gap:7px;height:32px;align-items:center;border-color:rgba(201,161,93,.45)}
 .pyall{display:inline-flex;gap:0!important}.pyall .tgi{display:inline-grid;place-items:center;width:24px;height:24px;margin-right:7px;flex:none;border-radius:50%;background:var(--gold,#C9A15D);color:#23483F;font:700 .8rem/1 "Noto Sans JP","Noto Sans SC","Noto Sans KR",var(--f-body),sans-serif;letter-spacing:-.02em}
 .pyall .small{font-size:.86rem;line-height:1}
