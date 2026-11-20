@@ -4615,8 +4615,10 @@ const HG_QM = [["l2r","Буква → звук","Бачите букву — о�
 const hgL = (uk, en) => (typeof i18nOn === "function" && i18nOn() ? en : uk);
 const hgState = () => S.hg || (S.hg = {sec: "intro", i: 0, v: 0, f: 0, quiz: null});
 const hgSay = (t, label) => `<button class="iconbtn" data-act="speak" data-say="${esc(t)}" aria-label="${label || "Послухати"}">${ICON_SPEAK}</button>`;
+const hgWriteSw = () => `<div class="row" style="gap:10px;align-items:center;flex-wrap:wrap"><button class="chip" aria-pressed="${!!S.hg?.write}" data-act="hgWrite">✍ ${hgL("Як пишеться", "How to write")}</button><span class="small muted">${S.hg?.write ? hgL("Натисніть на букву — покажемо порядок рис і дамо спробувати написати.", "Tap a letter to see its stroke order and try writing it.") : hgL("Увімкніть, щоб натисканням на букву бачити порядок рис.", "Turn on to see the stroke order when you tap a letter.")}</span></div>`;
 function hgLetterCard(ch, rom, uk, sayT, extra){
-  return `<button class="panel hgcard" data-act="speak" data-say="${esc(sayT)}" aria-label="Послухати ${esc(sayT)}"><span class="hgl">${ch}</span><b class="hgr">${esc(rom)}</b><span class="small muted">${esc(uk)}</span>${extra || ""}</button>`;
+  if (S.hg?.write) return `<button class="panel hgcard" data-act="bsOpen" data-h="${esc(ch)}" data-p="${esc(rom)}" data-uk="${esc(uk)}" aria-label="${hgL("Як пишеться", "How to write")} ${esc(ch)}"><span class="hgl">${ch}</span><b class="hgr">${esc(rom)}</b><span class="small muted">${esc(uk)}</span>${extra || ""}</button>`;
+  return `<button class="panel hgcard" data-act="speak" data-say="${esc(sayT)}" aria-label="${hgL("Послухати", "Listen to")} ${esc(sayT)}"><span class="hgl">${ch}</span><b class="hgr">${esc(rom)}</b><span class="small muted">${esc(uk)}</span>${extra || ""}</button>`;
 }
 function hangulView(){
   const st = hgState(), ctx = currentCtx(), me = ctx.preview || staffUI() ? null : S.me;
@@ -4639,13 +4641,13 @@ function hangulView(){
     <section class="panel stack" style="gap:10px"><h3>Як вчити</h3>
       <ol class="hgsteps"><li>Голосні — натискайте на картку, щоб послухати.</li><li>Приголосні — зверніть увагу на трійки: звичайний, з придихом і напружений.</li><li>Батчхім — 7 кінцевих звуків.</li><li>Конструктор — складайте свої склади й слухайте їх.</li><li>Вправи — перевірте себе.</li></ol>
     </section>`;
-  else if (st.sec === "vow") body = `
+  else if (st.sec === "vow") body = `${hgWriteSw()}
     <p class="small muted">Натисніть на картку, щоб почути звук. Склад записано з «німим» ㅇ: так голосні пишуть, коли перед ними немає приголосного.</p>
     <h3>Основні голосні</h3><div class="hggrid">${HG_V.map(([v, r, u, k, e]) => hgLetterCard(v, r, hgL(u, e), hgSyl(11, HG_VOW.indexOf(v), 0), `<span class="hgex">${hgSyl(11, HG_VOW.indexOf(v), 0)} · ${k === "v" ? hgL("праворуч", "on the right") : hgL("знизу", "below")}</span>`)).join("")}</div>
     <h3>Складні голосні</h3><p class="small muted">Утворюються з основних: ㅏ+ㅣ = ㅐ, ㅗ+ㅏ = ㅘ, ㅜ+ㅓ = ㅝ… ㅐ і ㅔ, ㅙ, ㅚ і ㅞ сьогодні звучать майже однаково.</p>
     <div class="hggrid">${HG_V2.map(([v, r, u, e]) => hgLetterCard(v, r, hgL(u, e), hgSyl(11, HG_VOW.indexOf(v), 0), `<span class="hgex">${hgSyl(11, HG_VOW.indexOf(v), 0)}</span>`)).join("")}</div>`;
   else if (st.sec === "cons") { const grp = g => HG_C.filter(x => x[4] === g).map(([c, n, r, u, g, e]) => hgLetterCard(c, r, hgL(u, e), hgSyl(HG_INI.indexOf(c), 0, 0), `<span class="hgex">${hgSyl(HG_INI.indexOf(c), 0, 0)} · ${n}</span>`)).join("");
-    body = `<p class="small muted">Натисніть на картку — прозвучить склад з ㅏ. Під буквою — її назва. Там, де дві транскрипції (g / k), перша — на початку складу, друга — у кінці.</p>
+    body = `${hgWriteSw()}<p class="small muted">Натисніть на картку — прозвучить склад з ㅏ. Під буквою — її назва. Там, де дві транскрипції (g / k), перша — на початку складу, друга — у кінці.</p>
     <h3>Основні приголосні</h3><div class="hggrid">${grp("b")}</div>
     <h3>З придихом</h3><p class="small muted">Вимовляються з сильним видихом — піднесіть долоню до рота й відчуйте повітря.</p><div class="hggrid">${grp("a")}</div>
     <h3>Напружені (подвійні)</h3><p class="small muted">Вимовляються коротко й напружено, без видиху.</p><div class="hggrid">${grp("t")}</div>
@@ -5185,18 +5187,91 @@ function rkAnswer(k){
   if (x.say) speak(x.say);
   render();
 }
+// ---------- Hangul stroke order: our own centre-line strokes for every jamo (standard school order),
+// syllables are assembled automatically: initial consonant → vowel → final consonant (batchim).
+const KO_J = {
+  "ㄱ": ["M14 18 L84 18 L80 88"],
+  "ㄴ": ["M18 12 L18 84 L88 84"],
+  "ㄷ": ["M16 16 L84 16", "M16 16 L16 84 L88 84"],
+  "ㄹ": ["M16 12 L82 12 L82 47", "M16 48 L82 48", "M16 48 L16 88 L88 88"],
+  "ㅁ": ["M16 14 L16 88", "M16 14 L84 14 L84 88", "M16 88 L84 88"],
+  "ㅂ": ["M18 10 L18 88", "M82 10 L82 88", "M18 48 L82 48", "M18 88 L82 88"],
+  "ㅅ": ["M52 10 L46 46 L12 90", "M47 47 L88 90"],
+  "ㅇ": ["M50 16 A36 36 0 0 0 50 88 A36 36 0 0 0 50 16"],
+  "ㅈ": ["M16 16 L80 16 L14 90", "M50 52 L88 90"],
+  "ㅊ": ["M46 3 L54 13", "M16 24 L80 24 L14 92", "M49 58 L88 92"],
+  "ㅋ": ["M14 18 L84 18 L80 88", "M16 52 L82 52"],
+  "ㅌ": ["M16 14 L84 14", "M16 48 L80 48", "M16 14 L16 86 L88 86"],
+  "ㅍ": ["M12 16 L88 16", "M34 16 L36 84", "M66 16 L64 84", "M10 86 L90 86"],
+  "ㅎ": ["M50 4 L50 18", "M18 28 L82 28", "M50 42 A24 24 0 0 0 50 90 A24 24 0 0 0 50 42"],
+  "ㅏ": ["M40 4 L40 96", "M40 50 L72 50"],
+  "ㅑ": ["M40 4 L40 96", "M40 36 L72 36", "M40 64 L72 64"],
+  "ㅓ": ["M24 50 L60 50", "M60 4 L60 96"],
+  "ㅕ": ["M24 36 L60 36", "M24 64 L60 64", "M60 4 L60 96"],
+  "ㅣ": ["M50 4 L50 96"],
+  "ㅐ": ["M30 4 L30 96", "M30 50 L56 50", "M70 4 L70 96"],
+  "ㅒ": ["M30 4 L30 96", "M30 36 L56 36", "M30 64 L56 64", "M70 4 L70 96"],
+  "ㅔ": ["M16 50 L40 50", "M40 4 L40 96", "M70 4 L70 96"],
+  "ㅖ": ["M14 36 L40 36", "M14 64 L40 64", "M40 4 L40 96", "M70 4 L70 96"],
+  "ㅗ": ["M50 22 L50 60", "M6 60 L94 60"],
+  "ㅛ": ["M36 22 L36 60", "M64 22 L64 60", "M6 60 L94 60"],
+  "ㅜ": ["M6 40 L94 40", "M50 40 L50 80"],
+  "ㅠ": ["M6 40 L94 40", "M36 40 L36 80", "M64 40 L64 80"],
+  "ㅡ": ["M6 50 L94 50"]
+};
+const KO_PAIR = {"ㄲ": "ㄱㄱ", "ㄸ": "ㄷㄷ", "ㅃ": "ㅂㅂ", "ㅆ": "ㅅㅅ", "ㅉ": "ㅈㅈ", "ㄳ": "ㄱㅅ", "ㄵ": "ㄴㅈ", "ㄶ": "ㄴㅎ", "ㄺ": "ㄹㄱ", "ㄻ": "ㄹㅁ", "ㄼ": "ㄹㅂ", "ㄽ": "ㄹㅅ", "ㄾ": "ㄹㅌ", "ㄿ": "ㄹㅍ", "ㅀ": "ㄹㅎ", "ㅄ": "ㅂㅅ"};
+const KO_MIX = {"ㅘ": "ㅗㅏ", "ㅙ": "ㅗㅐ", "ㅚ": "ㅗㅣ", "ㅝ": "ㅜㅓ", "ㅞ": "ㅜㅔ", "ㅟ": "ㅜㅣ", "ㅢ": "ㅡㅣ"};
+const KO_LI = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ", KO_VI = "ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ";
+const KO_TI = ["", "ㄱ", "ㄲ", "ㄳ", "ㄴ", "ㄵ", "ㄶ", "ㄷ", "ㄹ", "ㄺ", "ㄻ", "ㄼ", "ㄽ", "ㄾ", "ㄿ", "ㅀ", "ㅁ", "ㅂ", "ㅄ", "ㅅ", "ㅆ", "ㅇ", "ㅈ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ"];
+const KO_HOR = "ㅗㅛㅜㅠㅡ";
+// scale a 100×100 jamo into the box [x, y, w, h]
+function koPlace(paths, x, y, w, h){
+  const X = v => (x + v * w / 100).toFixed(1), Y = v => (y + v * h / 100).toFixed(1);
+  return paths.map(p => { const t = p.match(/[MLA]|-?\d+(?:\.\d+)?/g); let out = [], i = 0, c = "";
+    while (i < t.length){ if (/[MLA]/.test(t[i])){ c = t[i++]; out.push(c); continue; }
+      if (c === "A"){ const [rx, ry, , la, sw, ex, ey] = t.slice(i, i + 7).map(Number); out.push((rx * w / 100).toFixed(1), (ry * h / 100).toFixed(1), 0, la, sw, (x + ex * w / 100).toFixed(2), Y(ey)); i += 7; }
+      else { out.push(X(+t[i]), Y(+t[i + 1])); i += 2; } }
+    return out.join(" "); });
+}
+function koJamo(j, x, y, w, h){
+  if (KO_PAIR[j]){ const [a, b] = [...KO_PAIR[j]]; return [...koJamo(a, x, y, w * .52, h), ...koJamo(b, x + w * .48, y, w * .52, h)]; }
+  return KO_J[j] ? koPlace(KO_J[j], x, y, w, h) : [];
+}
+function koVowel(v, box){ // box = {h: [x,y,w,h] for the horizontal part, v: [...] for the vertical part, one: [...] when the vowel is simple}
+  if (KO_MIX[v]){ const [a, b] = [...KO_MIX[v]]; return [...koJamo(a, ...box.h), ...koJamo(b, ...box.v)]; }
+  return koJamo(v, ...(KO_HOR.includes(v) ? box.h : box.v));
+}
+// strokes of one hangul character in the 0…109 box used by KvgWriter, or null
+function koStrokes(ch){
+  const cp = ch.codePointAt(0); let s = [];
+  if (cp >= 0xAC00 && cp <= 0xD7A3){
+    const c = cp - 0xAC00, L = KO_LI[Math.floor(c / 588)], V = KO_VI[Math.floor((c % 588) / 28)], T = KO_TI[c % 28];
+    const kind = KO_MIX[V] ? "m" : KO_HOR.includes(V) ? "h" : "v";
+    const B = T ? {v: {L: [4, 6, 50, 50], v: [52, 2, 44, 60]}, h: {L: [18, 2, 64, 30], h: [4, 28, 92, 34]}, m: {L: [6, 4, 46, 28], h: [2, 24, 62, 36], v: [60, 2, 38, 60]}}[kind]
+                : {v: {L: [4, 14, 52, 72], v: [52, 2, 44, 96]}, h: {L: [16, 4, 68, 46], h: [2, 44, 96, 52]}, m: {L: [6, 6, 48, 40], h: [2, 40, 62, 50], v: [60, 2, 38, 96]}}[kind];
+    s = [...koJamo(L, ...B.L), ...koVowel(V, B), ...(T ? koJamo(T, 14, 62, 72, 34) : [])];
+  } else if (cp >= 0x3131 && cp <= 0x3163){
+    if (KO_MIX[ch]) s = koVowel(ch, {h: [4, 10, 58, 80], v: [58, 2, 40, 96]});
+    else if (KO_VI.includes(ch)) s = KO_HOR.includes(ch) ? koJamo(ch, 4, 10, 92, 80) : koJamo(ch, 14, 2, 72, 96);
+    else s = koJamo(ch, 12, 12, 76, 76);
+  }
+  if (!s.length) return null;
+  return koPlace(s, 4.5, 4.5, 100, 100);
+}
+
 // ---------- «Як пишеться»: stroke order. Chinese — Hanzi Writer + Make Me a Hanzi data (CDN);
 // Japanese kana and kanji — KanjiVG data (© Ulrich Apel, CC BY-SA 3.0) from the kvg/ folder next to this page, drawn by our own writer.
 const HWR_LIB = ["https://cdn.jsdelivr.net/npm/hanzi-writer@3.7.2/dist/hanzi-writer.min.js", "https://unpkg.com/hanzi-writer@3.7.2/dist/hanzi-writer.min.js"];
 const HWR_DATA = ["https://cdn.jsdelivr.net/npm/hanzi-writer-data@2.0.1/", "https://unpkg.com/hanzi-writer-data@2.0.1/"];
 const KVG_SHARDS = 32;
-const HWR = {lib: null, data: {}, jdata: {}, sh: {}, w: null, d: null, k: 0, qw: null};
+const HWR = {lib: null, data: {}, jdata: {}, kdata: {}, sh: {}, w: null, d: null, k: 0, qw: null};
 const HWR_C = {stroke: "#23483F", cur: "#C9A15D", pale: "#E6DDCB", grid: "#E8DCC4", draw: "#2C2C2C", bad: "#A4473A"};
 const hwL = (uk, en) => (typeof i18nOn === "function" && i18nOn() ? en : uk);
 const isHan = c => /\p{Script=Han}/u.test(c);
 const isJaW = c => /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}ー々]/u.test(c);
-const hwOkLang = l => l === "zh" || l === "ja";
-const hwIsW = (c, lang) => lang === "ja" ? isJaW(c) : isHan(c);
+const hwOkLang = l => l === "zh" || l === "ja" || l === "ko";
+const isKoW = c => /[\uAC00-\uD7A3\u3131-\u3163]/.test(c);
+const hwIsW = (c, lang) => lang === "ja" ? isJaW(c) : lang === "ko" ? isKoW(c) : isHan(c);
 const hwChars = (h, lang) => [...new Set([...String(h || "")].filter(c => hwIsW(c, lang || LANG_CUR)))];
 const hwStrokesWord = n => hwL(plural(n, "риса", "риси", "рис"), n === 1 ? "stroke" : "strokes");
 const ICON_BRUSH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18.4 2.6a2 2 0 0 1 2.9 2.9L11 15.8l-3.9 1 1-3.9z"/><path d="M4 21c1.5 0 3-1 3-3"/></svg>';
@@ -5207,11 +5282,12 @@ function hwLib(){
   HWR.lib = load(HWR_LIB[0]).catch(() => load(HWR_LIB[1])).catch(() => { HWR.lib = null; return null; });
   return HWR.lib;
 }
-const KVG_ENGINE = {create: (el, ch, o) => new KvgWriter(el, HWR.jdata[ch], o)};
-const hwEngine = lang => lang === "ja" ? Promise.resolve(KVG_ENGINE) : hwLib();
+const KVG_ENGINE = {create: (el, ch, o) => new KvgWriter(el, HWR.jdata[ch], o)}, KO_ENGINE = {create: (el, ch, o) => new KvgWriter(el, HWR.kdata[ch], o)};
+const hwEngine = lang => lang === "ja" ? Promise.resolve(KVG_ENGINE) : lang === "ko" ? Promise.resolve(KO_ENGINE) : hwLib();
 // stroke data: an object, null when the character is not in the base, undefined when loading failed
 async function hwData(ch, lang){
   if (lang === "ja") return kvgData(ch);
+  if (lang === "ko"){ if (!(ch in HWR.kdata)){ const st = koStrokes(ch); HWR.kdata[ch] = st ? {kvg: true, strokes: st} : null; } return HWR.kdata[ch]; }
   if (ch in HWR.data) return HWR.data[ch];
   let missing = false;
   for (const base of HWR_DATA){
@@ -5335,16 +5411,18 @@ function hwBtn(w){
   const t = hwL("Як пишеться", "How to write");
   return `<button class="iconbtn hwb" data-act="bsOpen" data-h="${esc(w.h)}" data-p="${esc(w.p || "")}" data-uk="${esc(w.uk || "")}" aria-label="${t} ${esc(w.h)}" title="${t}">${ICON_BRUSH}</button>`;
 }
-const hwCredit = lang => lang === "ja"
+const hwCredit = lang => lang === "ko"
+  ? hwL("Порядок рис — за стандартним шкільним письмом хангилю: зверху вниз, зліва направо. У складі: перша приголосна → голосна → батчхім.", "Standard school stroke order for hangeul: top to bottom, left to right. In a syllable: initial consonant → vowel → batchim.")
+  : lang === "ja"
   ? hwL("Порядок рис — за японським стандартом. Дані: KanjiVG © Ulrich Apel, ліцензія CC BY-SA 3.0.", "Japanese stroke order. Data: KanjiVG © Ulrich Apel, CC BY-SA 3.0 licence.")
   : hwL("Порядок рис — за стандартом спрощених ієрогліфів (як у підручниках HSK). Дані: Make Me a Hanzi, Hanzi Writer. Для анімації потрібен інтернет.", "Stroke order follows the simplified-character standard (as in HSK textbooks). Data: Make Me a Hanzi, Hanzi Writer. The animation needs an internet connection.");
 
 // ---- the «Як пишеться» window
 function hwModalHtml(md){
-  const ch = md.chars[md.ci], lj = md.lang === "ja" ? ` lang="ja"` : "";
+  const ch = md.chars[md.ci], lj = md.lang !== "zh" ? ` lang="${md.lang}"` : "";
   const tabs = md.chars.length > 1 ? `<div class="chips hwtabs" role="group" aria-label="${hwL("Знаки слова", "Characters of the word")}">${md.chars.map((c, i) => `<button class="opt h${i === md.ci ? " sel" : ""}" data-act="hwChar" data-arg="${i}" aria-pressed="${i === md.ci}"${lj}>${esc(c)}</button>`).join("")}</div>` : "";
   return `<div class="mbox hwbox" role="dialog" aria-modal="true" aria-label="${hwL("Як пишеться", "How to write")} ${esc(md.h)}">
-    <div class="spread" style="align-items:flex-start;gap:10px"><div style="min-width:0"><div class="eyebrow">${md.lang === "ja" ? "書き順" : "笔顺"} · ${hwL("Як пишеться", "How to write")}</div>
+    <div class="spread" style="align-items:flex-start;gap:10px"><div style="min-width:0"><div class="eyebrow">${md.lang === "ja" ? "書き順" : md.lang === "ko" ? "필순" : "笔顺"} · ${hwL("Як пишеться", "How to write")}</div>
       <div class="hwword"><span class="han"${lj}>${esc(md.h)}</span></div><div class="small muted">${md.p ? `<span class="pyx">${esc(md.p)}</span>` : ""}${md.p && md.uk ? " · " : ""}${esc(md.uk || "")}</div></div>
       <button class="iconbtn" data-act="closeModal" aria-label="${hwL("Закрити", "Close")}">✕</button></div>
     ${tabs}
@@ -5364,7 +5442,7 @@ function hwModalHtml(md){
   </div>`;
 }
 const hwMsg = (t, cls) => { const m = document.getElementById("bs-msg"); if (m){ m.textContent = t || ""; m.className = "hwmsg small" + (cls ? " " + cls : ""); } };
-const hwWOpts = (lang, o) => ({padding: lang === "ja" ? 4 : 14, charDataLoader: hwLoader, strokeColor: HWR_C.stroke, outlineColor: HWR_C.pale, highlightColor: HWR_C.cur, drawingColor: HWR_C.draw, radicalColor: null, delayBetweenStrokes: 300, strokeAnimationSpeed: 1, ...o});
+const hwWOpts = (lang, o) => ({padding: lang !== "zh" ? 4 : 14, charDataLoader: hwLoader, strokeColor: HWR_C.stroke, outlineColor: HWR_C.pale, highlightColor: HWR_C.cur, drawingColor: HWR_C.draw, radicalColor: null, delayBetweenStrokes: 300, strokeAnimationSpeed: 1, ...o});
 async function hwModalSetup(md){
   const ci = md.ci, ch = md.chars[ci], lang = md.lang, stale = () => S.modal !== md || md.ci !== ci;
   HWR.w = null; HWR.d = null; HWR.k = 0; md.mode = "writer";
@@ -5408,9 +5486,9 @@ function hwOpenModal(h, p, uk){
 
 // ---- «Прописи» exercise: write each character of the word from its translation and pronunciation
 function hwQView(e, q, top, next, verdict, sayBtn){
-  const shown = i => e.done || i < e.hci, lj = q.lang === "ja" ? ` lang="ja"` : "";
+  const shown = i => e.done || i < e.hci, lj = q.lang && q.lang !== "zh" ? ` lang="${q.lang}"` : "";
   const slots = q.chars.map((c, i) => `<span class="hwslot${shown(i) ? " on" : i === e.hci ? " cur" : ""}"${lj}>${shown(i) ? esc(c) : "？"}</span>`).join("");
-  const task = q.lang === "ja" ? hwL("Напишіть слово японською — кожен знак риса за рисою, у правильному порядку.", "Write the word in Japanese — each character stroke by stroke, in the right order.") : hwL("Напишіть слово ієрогліфами — риса за рисою, у правильному порядку.", "Write the word in characters — stroke by stroke, in the right order.");
+  const task = q.lang === "ko" ? hwL("Напишіть слово хангилем — склад за складом, риса за рисою, у правильному порядку.", "Write the word in hangeul — syllable by syllable, stroke by stroke, in the right order.") : q.lang === "ja" ? hwL("Напишіть слово японською — кожен знак риса за рисою, у правильному порядку.", "Write the word in Japanese — each character stroke by stroke, in the right order.") : hwL("Напишіть слово ієрогліфами — риса за рисою, у правильному порядку.", "Write the word in characters — stroke by stroke, in the right order.");
   const prompt = `<div class="qprompt" style="gap:6px"><div class="row" style="gap:10px;align-items:center;justify-content:center">${speakBtn(q.h, hwL("Послухати слово", "Listen to the word"))}<div style="font-size:1.25rem;font-weight:600">«${esc(q.uk)}»</div></div>${q.p ? `<div class="py pykeep">${esc(q.p)}</div>` : ""}<span class="small muted koraw">${task}</span></div>`;
   if (e.done) return `<div class="quiz furiok">${top}${prompt}<div class="hwslots" aria-label="${hwL("Слово", "Word")}">${slots}</div>
     <p class="small muted" style="text-align:center;margin:0">${hwL("Помилок у рисах", "Stroke mistakes")}: <b class="num">${e.hmiss}</b>${e.hhint ? " · " + hwL("з контуром-підказкою", "with the outline hint") : ""}${e.hskip ? " · " + hwL("підглянуто відповідь", "answer shown") : ""}</p>
@@ -5439,7 +5517,7 @@ function hwAfterRender(){
     if (!lib || !d){ el.innerHTML = ""; hwQMsg(hwL("Не вдалося завантажити дані для письма. Перевірте інтернет і натисніть «Не пам'ятаю — показати», щоб іти далі.", "Could not load the writing data. Check your internet connection, or press “I don't remember — show me” to continue."), "bad"); return; }
     el.innerHTML = "";
     const size = Math.round(el.clientWidth || 240);
-    const w = HWR.qw = lib.create(el, ch, hwWOpts(lang, {width: size, height: size, padding: lang === "ja" ? 4 : 12, showCharacter: false, showOutline: !!e.hhint, delayBetweenStrokes: 250}));
+    const w = HWR.qw = lib.create(el, ch, hwWOpts(lang, {width: size, height: size, padding: lang !== "zh" ? 4 : 12, showCharacter: false, showOutline: !!e.hhint, delayBetweenStrokes: 250}));
     if (e.hskip){ w.animateCharacter({onComplete: () => setTimeout(() => hwQNext(e, i, hci), 700)}); return; }
     w.quiz({showHintAfterMisses: 3, leniency: 1.1,
       onMistake: s => { e.hmiss++; hwQMsg(s.mistakesOnStroke >= 3 ? hwL("Підказка: підсвічено, де починається риса.", "Hint: the stroke is highlighted.") : hwL("Не та риса або не той напрямок — спробуйте ще раз.", "Wrong stroke or direction — try again."), "bad"); },
@@ -6397,8 +6475,8 @@ function startEx(type){
     e.words = words; e.pool = distPool;
   } else if (type === "hand"){
     const seen = new Set();
-    const lg = LANG_CUR === "ja" ? "ja" : "zh";
-    const ws = shuffle(words).map(w => ({w, h: coreH(w.h)})).filter(o => o.h && [...o.h].length <= (lg === "ja" ? 5 : 4) && [...o.h].every(c => hwIsW(c, lg)) && !seen.has(o.h) && seen.add(o.h)).slice(0, 8);
+    const lg = hwOkLang(LANG_CUR) ? LANG_CUR : "zh";
+    const ws = shuffle(words).map(w => ({w, h: coreH(w.h)})).filter(o => o.h && [...o.h].length <= (lg === "zh" ? 4 : 5) && [...o.h].every(c => hwIsW(c, lg)) && !seen.has(o.h) && seen.add(o.h)).slice(0, 8);
     if (!ws.length) return fail("Для прописів потрібні слова, записані ієрогліфами");
     e.qs = ws.map(o => ({wid: o.w.id, kind: "hand", lang: lg, h: o.h, chars: [...o.h], p: o.w.p || "", uk: o.w.uk || ""}));
     hwEngine(lg);
@@ -7147,6 +7225,7 @@ const ACT = {
   hgStop(){ hgState().quiz = null; render(); },
   hgAns(k){ hgAnswer(+k); },
   knSec(k){ knState().sec = k; if (k !== "quiz") S.kn.quiz = null; if (k === "hira") S.kn.script = "h"; if (k === "kata") S.kn.script = "k"; if (S.kn.script === "b" && k !== "quiz") S.kn.script = "h"; render(); },
+  hgWrite(){ hgState().write = !S.hg.write; render(); },
   knWrite(){ knState().write = !S.kn.write; render(); },
   knScript(k){ knState().script = k; S.kn.quiz = null; render(); },
   knStart(m){ const st = knState(); st.sec = "quiz"; st.quiz = {mode: m, script: st.script, qs: knMakeQs(m, st.script), i: 0, ok: 0, ans: null}; const x = st.quiz.qs[0]; if (x?.listen) speak(x.say); render(); },
