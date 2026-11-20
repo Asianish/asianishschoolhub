@@ -437,6 +437,14 @@ textarea.input{min-height:110px;resize:vertical;font-family:var(--f-body)}
 /* modal + toast */
 #modal{position:fixed;inset:0;z-index:40;background:rgba(17,28,25,.55);display:grid;place-items:center;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
 #modal[hidden]{display:none!important}
+.hwmatpick{margin-top:8px;border:1px solid var(--line);border-radius:var(--r-sm);padding:10px 12px;background:var(--surface)}
+.hwmatpick summary{cursor:pointer;font-weight:600}
+.hwmats{display:flex;flex-direction:column;gap:6px;max-height:340px;overflow:auto}
+.hwmat{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
+.hwmat[hidden]{display:none}
+.hwmat-t{display:flex;flex-direction:column;min-width:0;flex:1}
+.hwmat-t b{overflow-wrap:anywhere}
+.hwmat .btn{flex:none}
 .hwbox{width:min(640px,100%)}
 .hwword .han{font-size:2rem;line-height:1.2}
 .hwtabs .opt{min-height:44px;min-width:52px;font-size:1.4rem}
@@ -4184,13 +4192,34 @@ function hwEditView(e){
         <div class="field"><label for="hw-due">Здати до</label><input class="input" id="hw-due" name="due" type="date" value="${esc(e.due || "")}"></div></div>
       <div class="field"><label for="hw-text">Завдання</label><textarea class="input" id="hw-text" name="text" rows="6" maxlength="4000" placeholder="Що зробити. Наприклад: вивчити слова уроку 5, скласти 5 речень з 在, прочитати текст уголос.">${esc(e.text)}</textarea></div>
       <div class="field"><label for="hw-pages">Сторінки підручника (необов'язково)</label><input class="input" id="hw-pages" name="pages" maxlength="200" value="${esc(e.pages)}" placeholder="HSK 2 Standard Course, с. 34–36, вправи 2 і 4"></div>
-      <div class="field"><label for="hw-links">Посилання — кожне з нового рядка (необов'язково)</label><textarea class="input" id="hw-links" name="links" rows="3" maxlength="2000" placeholder="Відео про тони | https://youtube.com/…&#10;https://miro.com/…">${esc((e.links || []).map(l => (l.title ? l.title + " | " : "") + l.url).join("\n"))}</textarea><span class="hint">Формат: «назва | посилання» або просто посилання.</span></div>
+      <div class="field"><label for="hw-links">Посилання — кожне з нового рядка (необов'язково)</label><textarea class="input" id="hw-links" name="links" rows="3" maxlength="4000" placeholder="Відео про тони | https://youtube.com/…&#10;https://miro.com/…">${esc((e.links || []).map(l => (l.title ? l.title + " | " : "") + l.url).join("\n"))}</textarea><span class="hint">Формат: «назва | посилання» або просто посилання.</span>${hwMatPicker(e)}</div>
       ${phApi() ? `<div class="field"><label>Фото до завдання (необов'язково)</label><span class="hint">Сфотографуйте або заскріньте сторінку підручника чи вправу — учні відкриють фото прямо в ДЗ.</span>${phField(hwPhKey(e), e.photos)}</div>` : ""}
       ${hwTaskBuilder(e)}
       <div class="field"><label for="hw-ans">Як здавати</label><select class="input" id="hw-ans" name="answer"><option value="text" ${e.answer !== "check" ? "selected" : ""}>Письмова відповідь (текст і/або посилання)</option><option value="check" ${e.answer === "check" ? "selected" : ""}>Достатньо позначити «Виконано»</option></select></div>
       <label class="hwchk"><input type="checkbox" name="hidden" ${e.hidden ? "checked" : ""}> Приховати від учнів (чернетка)</label>
       <div class="row"><button class="btn primary" type="submit">${e.id ? "Зберегти" : "Задати ДЗ"}</button><button class="btn ghost" type="button" data-act="hwCancel">Скасувати</button></div>
     </form></div>`;
+}
+// ---- «Додати з моїх матеріалів»: put links from the teacher's «Матеріали» into the homework
+function hwMatList(){
+  const admin = S.role === "admin";
+  return Object.values(S.materials || {}).filter(m => (m.lang || (m.hsk ? lvLang(m.hsk) : "zh")) === LANG_CUR && m.kind !== "file" && hwSafeUrl(m.url) && (admin || m.createdBy === S.uid))
+    .sort((a, b) => (lvIdx(a.hsk) - lvIdx(b.hsk)) || String(a.lesson || "яяя").localeCompare(b.lesson || "яяя", "uk", {numeric: true}) || (b.createdAt || 0) - (a.createdAt || 0));
+}
+function hwMatPicker(e){
+  const list = hwMatList(), have = new Set((e.links || []).map(l => l.url));
+  if (!list.length) return `<span class="hint">📁 Тут можна буде додавати посилання зі своїх матеріалів — спершу збережіть їх у розділі «Матеріали».</span>`;
+  const admin = S.role === "admin", tn = m => S.teachers[m.teacherId]?.name || "";
+  const row = m => { const u = hwSafeUrl(m.url), on = have.has(u), meta = [m.hsk ? lvName(m.hsk) : "", m.lesson, hostOf(u), admin ? tn(m) : ""].filter(Boolean);
+    return `<div class="hwmat" data-q="${esc([m.title, m.lesson, m.note, u, m.hsk ? lvName(m.hsk) : ""].join(" ").toLowerCase())}"><span class="mat-ic" aria-hidden="true">${matTypeOf(m.type)[2]}</span>
+      <span class="hwmat-t"><b>${esc(m.title || hostOf(u))}</b>${meta.length ? `<span class="small muted">${meta.map(esc).join(" · ")}</span>` : ""}</span>
+      <button type="button" class="btn sm${on ? " gold" : ""}" data-act="hwMatAdd" data-arg="${esc(m.id)}" ${on ? "disabled" : ""}>${on ? "✓ Додано" : "+ Додати"}</button></div>`; };
+  return `<details class="hwmatpick"><summary>📁 Додати з моїх матеріалів <span class="muted">(${list.length})</span></summary>
+    <div class="stack" style="gap:8px;margin-top:10px">
+      ${list.length > 6 ? `<input class="input" data-hwmq="1" placeholder="Пошук: назва, урок, рівень" aria-label="Пошук у матеріалах">` : ""}
+      <div class="hwmats">${list.map(row).join("")}</div>
+      <span class="hint">Матеріал додасться до посилань вище. Учні відкриють його за посиланням — перевірте, що в Miro, Canva чи Google Drive відкрито доступ «усім, хто має посилання».</span>
+    </div></details>`;
 }
 // ---- platform tasks inside a homework: cards, any exercise from «Вправи», grammar (read / topic exercises / drill)
 const HW_KINDS = {text: "Текст: прочитати й відповісти на питання", cards: "Картки (повторити слова)", ex: "Вправа з вкладки «Вправи»", gread: "Граматика: прочитати тему", gex: "Граматика: вправи теми", gdrill: "Граматика: тренування"};
@@ -4432,7 +4461,7 @@ function hwTaskBuilder(e){
 const hwPhKey = e => "h|" + (e?.id || "new");
 function hwRead(f){
   const fd = new FormData(f), e = S.hwEdit || {};
-  const links = String(fd.get("links") || "").split("\n").map(x => x.trim()).filter(Boolean).slice(0, 10).map(x => { const k = x.lastIndexOf("|"); const title = k > 0 ? x.slice(0, k).trim().slice(0, 80) : "", url = hwSafeUrl(k > 0 ? x.slice(k + 1) : x); return url ? {title, url} : null; }).filter(Boolean);
+  const links = String(fd.get("links") || "").split("\n").map(x => x.trim()).filter(Boolean).slice(0, 20).map(x => { const k = x.lastIndexOf("|"); const title = k > 0 ? x.slice(0, k).trim().slice(0, 80) : "", url = hwSafeUrl(k > 0 ? x.slice(k + 1) : x); return url ? {title, url} : null; }).filter(Boolean);
   return {...e, title: String(fd.get("title") || "").trim().slice(0, 120), classIds: fd.getAll("cls").map(String), sids: fd.getAll("sid").map(String), date: fd.get("date") || today(), due: fd.get("due") || "",
     text: String(fd.get("text") || "").trim().slice(0, 4000), pages: String(fd.get("pages") || "").trim().slice(0, 200), links, lessonId: "", gramId: "", tasks: (e.tasks || []).slice(), answer: fd.get("answer") === "check" ? "check" : "text", hidden: fd.get("hidden") === "on"};
 }
@@ -6941,6 +6970,15 @@ const ACT = {
   libMode(m){ S.libMode = m; S.gram = null; render(); },
   newClass(type){ S.modal = {kind: "newClass", type, tid: ctxTid()}; renderModal(); },
   bsOpen(_, el){ hwOpenModal(el.dataset.h, el.dataset.p, el.dataset.uk); },
+  hwMatAdd(id, el){
+    const m = S.materials?.[id], ta = document.getElementById("hw-links"); if (!m || !ta) return;
+    const u = hwSafeUrl(m.url); if (!u) return;
+    const lines = ta.value.split("\n").map(x => x.trim()).filter(Boolean);
+    if (lines.some(x => hwSafeUrl(x.slice(x.lastIndexOf("|") + 1)) === u)){ toast("Це посилання вже є в ДЗ"); }
+    else if (lines.length >= 20){ toast("У ДЗ може бути до 20 посилань"); return; }
+    else { const t = String(m.title || "").replace(/\|/g, "/").trim().slice(0, 80); lines.push((t ? t + " | " : "") + u); ta.value = lines.join("\n"); toast("Додано до посилань ДЗ"); }
+    if (el){ el.disabled = true; el.classList.add("gold"); el.textContent = "✓ Додано"; }
+  },
   hwChar(i){ const md = S.modal; if (md?.kind !== "stroke") return; md.ci = Math.max(0, Math.min(md.chars.length - 1, Number(i) || 0)); renderModal(); },
   hwPlay(){ if (!HWR.w) return; hwShowWriter(); hwMsg(""); HWR.w.cancelQuiz(); const ol = document.getElementById("bs-ol"); if (ol && !ol.checked){ ol.checked = true; HWR.w.showOutline(); } HWR.w.hideCharacter(); HWR.w.animateCharacter(); },
   hwStep(dir){ if (!HWR.d) return; const md = S.modal; HWR.w?.cancelQuiz(); hwMsg("");
@@ -7407,6 +7445,7 @@ document.addEventListener("input", e => {
   if (el.dataset.pe){ const pe = S.pedit; if (!pe) return; const f = el.dataset.pe, i = Number(el.dataset.i);
     if (f === "v"){ pe.skills[i].v = Number(el.value); const a = document.getElementById("pev-" + i), b = document.getElementById("pel-" + i); if (a) a.textContent = el.value; if (b) b.textContent = skLabel(Number(el.value)); }
     else if (f === "note") pe.skills[i].note = el.value; else pe[f] = el.value; return; }
+  if (el.dataset.hwmq){ const q = el.value.trim().toLowerCase(); document.querySelectorAll(".hwmat").forEach(r => { r.hidden = !!q && !r.dataset.q.includes(q); }); return; }
   if (el.dataset.mt === "url"){ const t = guessType(el.value); const sel = $("#mt-type"); if (t && sel){ sel.value = t; S.matNew.type = t; } return; }
   if (el.dataset.mf){ S.matF[el.dataset.mf] = el.value; const q = el.dataset.mf === "q", pos = el.selectionStart; render(); if (q){ const n = document.querySelector('[data-mf="q"]'); if (n){ n.focus(); try { n.setSelectionRange(pos, pos); } catch(_){} } } return; }
   if (el.id === "bank-q"){
