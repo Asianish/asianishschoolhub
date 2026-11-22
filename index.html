@@ -2765,14 +2765,14 @@ async function peCopySet(){
 
 // ---- age categories & monthly comments (kids 7–11, teens 12–16)
 const AGES = {kid: "Дитина (7–11)", teen: "Підліток (12–16)", adult: "Дорослий"};
-const AGES_GROUP = {teen: "Підлітки (12–16)", adult: "Дорослі"};
+const AGES_GROUP = {kid: "Діти (7–11)", teen: "Підлітки (12–16)", adult: "Дорослі"};
 function ageOpts(kind, cur){
   const set = kind === "individual" ? AGES : AGES_GROUP;
   const v = set[cur] ? cur : "adult";
   return Object.entries(set).map(([k, n]) => `<option value="${k}" ${k === v ? "selected" : ""}>${n}</option>`).join("");
 }
-function ageBadge(c){ const a = c?.age; if (a !== "kid" && a !== "teen") return ""; return c.kind === "individual" ? (a === "kid" ? "Дитина" : "Підліток") : "Підлітки"; }
-const isYoung = c => !!c && (c.age === "teen" || (c.age === "kid" && c.kind === "individual"));
+function ageBadge(c){ const a = c?.age; if (a !== "kid" && a !== "teen") return ""; return c.kind === "individual" ? (a === "kid" ? "Дитина" : "Підліток") : (a === "kid" ? "Діти" : "Підлітки"); }
+const isYoung = c => !!c && (c.age === "teen" || c.age === "kid");
 const MONTHS_FULL = ["Січень","Лютий","Березень","Квітень","Травень","Червень","Липень","Серпень","Вересень","Жовтень","Листопад","Грудень"];
 const curMonth = () => today().slice(0, 7);
 const monthName = m => { const [y, mm] = String(m).split("-"); return `${MONTHS_FULL[Number(mm) - 1] || m} ${y}`; };
