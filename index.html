@@ -1600,7 +1600,7 @@ const speakBtn = (t, label) => `<button class="iconbtn" data-act="speak" data-sa
 // ---------- data helpers
 const lessonsSorted = () => Object.values(S.lessons).filter(l => lvLang(l.hsk) === LANG_CUR).sort((a, b) => lvIdx(a.hsk) - lvIdx(b.hsk) || (a.order || 0) - (b.order || 0));
 const grammarSorted = () => Object.values(S.grammar).filter(g => lvLang(g.hsk) === LANG_CUR).sort((a, b) => lvIdx(a.hsk) - lvIdx(b.hsk) || (a.order || 0) - (b.order || 0));
-const classesSorted = () => Object.values(S.classes).filter(c => clsLang(c) === LANG_CUR).sort((a, b) => (a.order || 0) - (b.order || 0) || String(a.name).localeCompare(b.name, "uk"));
+const classesSorted = () => Object.values(S.classes).filter(c => allL() || clsLang(c) === LANG_CUR).sort((a, b) => (LANG_ORDER[clsLang(a)] - LANG_ORDER[clsLang(b)]) || (a.order || 0) - (b.order || 0) || String(a.name).localeCompare(b.name, "uk"));
 const classOf = st => st && st.classId ? S.classes[st.classId] : null;
 // A teacher can set an individual level for a student (st.lvo); it overrides the group level within the same language.
 const lvoOk = (st, cls) => { const o = st?.lvo; return o && Object.values(LVSETS).some(a => a.includes(o)) && (!cls || lvLang(o) === lvLang(cls.course || "HSK1")) ? o : ""; };
@@ -1608,6 +1608,8 @@ const lvoOk = (st, cls) => { const o = st?.lvo; return o && Object.values(LVSETS
 const LV_GONE = {HSK6: "HSK5", KO5: "KO4"};
 const courseOf = (st, cls) => lvoOk(st, cls) || LV_GONE[cls?.course] || cls?.course || (st?.level && Object.values(LVSETS).some(a => a.includes(st.level)) ? st.level : LV_GONE[st?.level] || HSK[0]);
 const clsLang = c => lvLang(c?.course || "HSK1");
+const allL = () => !!S.allLang && S.role === "admin";
+const LANG_ORDER = {zh: 0, ko: 1, ja: 2};
 const stLang = st => { const c = st?.classId ? S.classes[st.classId] : null; return c ? clsLang(c) : lvLang(st?.level || "HSK1"); };
 const levelsUpTo = course => HSK.slice(0, lvIdx(course) + 1);
 function availLessons(st, cls){
@@ -1664,7 +1666,7 @@ const isPair = c => !!c && c.kind !== "individual" && /пара/i.test(c.name ||
 function rankList(p, classId, tid, lg, school){
   return Object.entries(S.students)
     .filter(([id]) => !isStaffId(id))
-    .filter(([, st]) => school || stLang(st) === LANG_CUR)
+    .filter(([, st]) => school || allL() || stLang(st) === LANG_CUR)
     .filter(([, st]) => !lg || leagueOf(st) === lg)
     .filter(([, st]) => tid == null || studentTid(st) === tid)
     .filter(([, st]) => !classId || st.classId === classId)
@@ -2128,13 +2130,14 @@ function modeSwitch(mode){
 // TEACHER
 // =====================================================================
 // ---------- teachers: admin creates teacher profiles; each group/individual student belongs to one teacher
-const teachersSorted = () => Object.values(S.teachers).filter(t => tLang(t) === LANG_CUR).sort((a, b) => (a.order || 0) - (b.order || 0) || String(a.name).localeCompare(b.name, "uk"));
+const teachersSorted = () => Object.values(S.teachers).filter(t => allL() || tLang(t) === LANG_CUR).sort((a, b) => (LANG_ORDER[tLang(a)] - LANG_ORDER[tLang(b)]) || (a.order || 0) - (b.order || 0) || String(a.name).localeCompare(b.name, "uk"));
+const teachersAll = () => Object.values(S.teachers).sort((a, b) => (LANG_ORDER[tLang(a)] - LANG_ORDER[tLang(b)]) || (a.order || 0) - (b.order || 0) || String(a.name).localeCompare(b.name, "uk"));
 const tLang = t => t?.lang || (/корей/i.test(t?.subject || "") ? "ko" : /япон/i.test(t?.subject || "") ? "ja" : "zh");
 const myTeacherId = () => (S.uid && Object.values(S.teachers).find(t => t.uid && t.uid === S.uid)?.id) || "";
 const classesOf = tid => classesSorted().filter(c => (c.teacherId || "") === (tid || ""));
 const orphanClasses = () => classesSorted().filter(c => !c.teacherId || !S.teachers[c.teacherId]);
 const studentTid = st => { const c = classOf(st); return c && S.teachers[c.teacherId] ? c.teacherId : ""; };
-const studentsOf = tid => Object.entries(S.students).filter(([, st]) => studentTid(st) === tid && st.classId && S.classes[st.classId] && stLang(st) === LANG_CUR);
+const studentsOf = tid => Object.entries(S.students).filter(([, st]) => studentTid(st) === tid && st.classId && S.classes[st.classId] && stLang(st) === clsLang(S.classes[st.classId]));
 const isStaffId = id => Object.values(S.teachers || {}).some(t => t.uid === id) || ["admin", "teacher"].includes(S.staff?.[id]?.role);
 const unassignedStudents = () => Object.entries(S.students).filter(([id, st]) => (!st.classId || !S.classes[st.classId]) && !isStaffId(id) && (!st.level || stLang(st) === LANG_CUR));
 // Which teacher's cabinet is on screen: admin picks one; a teacher always sees her own.
@@ -2166,6 +2169,7 @@ function teacherView(){
   const v = S.view;
   if (S.role === "teacher" && !myTeacherId()) return claimView();
   if (v.name === "board") return boardView();
+  if (allL() && ALL_VIEWS.has(v.name)) return allViewWrap(v.name);
   if (adminSpaces() && !S.space) return spacePickView();
   if (adminSpaces() && !SPACES[S.space].ready) return spaceSoonView(S.space);
   if (v.name === "class" && S.classes[v.id]) return classView(S.classes[v.id]);
@@ -2201,9 +2205,9 @@ function guessType(url){
 function matView(){
   const admin = S.role === "admin", f = S.matF;
   // a teacher works only with her own materials; the administrator sees everyone's (the database enforces the same rule)
-  const all = Object.values(S.materials).filter(m => (m.lang || (m.hsk ? lvLang(m.hsk) : "zh")) === LANG_CUR).filter(m => m.kind !== "file" || m.assetId).filter(m => admin ? (f.who !== "mine" || m.createdBy === S.uid) : m.createdBy === S.uid);
+  const all = Object.values(S.materials).filter(m => allL() || (m.lang || (m.hsk ? lvLang(m.hsk) : "zh")) === LANG_CUR).filter(m => m.kind !== "file" || m.assetId).filter(m => admin ? (f.who !== "mine" || m.createdBy === S.uid) : m.createdBy === S.uid);
   const lvKey = m => m.hsk || "none";
-  const folders = [["", "Усі рівні"], ...HSK.map(h => [h, lvName(h)]), ["none", "Без рівня"]];
+  const folders = [["", "Усі рівні"], ...(allL() ? [...LVSETS.zh, ...LVSETS.ko, ...LVSETS.ja] : HSK).map(h => [h, lvName(h)]), ["none", "Без рівня"]];
   const inFolder = all.filter(m => !f.hsk || lvKey(m) === f.hsk);
   let list = inFolder.filter(m => !f.type || m.type === f.type);
   if (f.q.trim()){ const q = f.q.trim().toLowerCase(); list = list.filter(m => [m.title, m.lesson, m.note, m.url].some(x => String(x || "").toLowerCase().includes(q))); }
@@ -2228,7 +2232,7 @@ function matView(){
     <div><h1 class="pt">Матеріали</h1><p class="muted" style="max-width:66ch">Посилання на ваші дошки Miro, дизайни Canva, папки Google Drive, відео й ігри — розкладені по папках-рівнях і форматах. ${admin ? "Тут матеріали всіх викладачів. Кожен викладач бачить лише ті, які додав сам." : "Ці матеріали бачите лише ви (і адміністраторка школи). Інші викладачі їх не бачать."}</p></div>
     ${folderBar}
     <div class="two">
-      <form class="panel form" data-form="matAdd">
+      ${allL() ? `<div class="panel stack" style="gap:10px"><h3>Додати посилання</h3><p class="small muted" style="margin:0">Тут зібрані матеріали всіх мов. Щоб додати новий, відкрийте потрібну мову — він ляже в її папки.</p><div class="row" style="gap:8px;flex-wrap:wrap">${["zh", "ko", "ja"].map(l => `<button class="btn sm" data-act="allOpen" data-arg="${l}:materials">${SPACES[l].seal} ${SPACES[l].name}</button>`).join("")}</div></div>` : `<form class="panel form" data-form="matAdd">
         <h3>Додати посилання${folderName ? ` у «${esc(folderName)}»` : ""}</h3>
         <div class="field"><label for="mt-url">Посилання</label><input class="input" type="url" id="mt-url" name="url" required placeholder="https://miro.com/… · canva.com/… · drive.google.com/…" data-mt="url"></div>
         <div class="field"><label for="mt-title">Назва</label><input class="input" id="mt-title" name="title" placeholder="Напр.: Гра на слова уроку 5"></div>
@@ -2240,7 +2244,7 @@ function matView(){
         <div class="field"><label for="mt-note">Примітка</label><input class="input" id="mt-note" name="note" placeholder="необов'язково"></div>
         <p class="err" id="mt-err" hidden></p>
         <button class="btn primary" type="submit">Додати</button>
-      </form>
+      </form>`}
       <div class="panel stack" style="gap:12px"><h3>Формат і сортування</h3>
         ${typeBar}
         <input class="input" data-mf="q" value="${esc(f.q)}" placeholder="Пошук: назва, урок, примітка" aria-label="Пошук матеріалів">
@@ -2270,7 +2274,7 @@ function codesView(){
       <td><span class="code" style="font-size:1.05rem">${esc(c.code || "—")}</span></td>
       <td class="n">${c.kind === "individual" ? (n ? "✓ увійшов" : "ще не входив") : n}</td>
       <td style="text-align:right;white-space:nowrap"><button class="btn sm" data-act="copyCode" data-arg="${esc(c.id)}">Копіювати код</button><button class="btn sm primary" data-act="copyInvite" data-arg="${esc(c.id)}">Копіювати повідомлення</button></td></tr>`; };
-  const secs = groupsBy.filter(g => g.cs.length).map(g => `<section><div class="sh"><h3>${g.t ? esc(g.t.name) : "Без викладача"}</h3><span class="small muted">${g.cs.length}</span></div>
+  const secs = groupsBy.filter(g => g.cs.length).map(g => `<section><div class="sh"><h3>${g.t ? esc(g.t.name) : "Без викладача"}${allL() && g.t ? " " + langPill(tLang(g.t)) : ""}</h3><span class="small muted">${g.cs.length}</span></div>
     <div class="tablewrap"><table><thead><tr><th>Група / учень</th><th>Код</th><th class="n">Студентів</th><th></th></tr></thead><tbody>${g.cs.map(row).join("")}</tbody></table></div></section>`).join("");
   return `<div class="stack">${backCrumb("Коди для входу")}
     <div class="spread"><div><h1 class="pt">Коди для входу</h1><p class="muted" style="max-width:64ch">Групі — один код на всіх, індивідуальному учню — власний. «Копіювати повідомлення» копіює готовий текст із посиланням і кодом — просто вставте його в Telegram чи Viber.</p></div>
@@ -2284,6 +2288,7 @@ async function copyText(text, okMsg){
   catch(e){ S.modal = {kind: "copy", text}; renderModal(); }
 }
 function backCrumb(title){
+  if (allL()) return `<div class="crumb"><button class="link" data-act="spaces">← Адміністратор</button><span>/</span><span>Усі мови</span><span>/</span><span>${esc(title)}</span></div>`;
   const t = S.role === "admin" && S.view.tid && S.teachers[S.view.tid];
   return `<div class="crumb"><button class="link" data-act="home">← ${S.role === "admin" ? "Адміністратор" : "Кабінет"}</button>${t ? `<span>/</span><button class="link" data-act="openTeacher" data-arg="${esc(t.id)}">${esc(t.name)}</button>` : ""}<span>/</span><span>${esc(title)}</span></div>`;
 }
@@ -2302,6 +2307,39 @@ function roleNote(){
     ? "Ви створюєте викладачів, бачите всі групи й учнів школи та керуєте доступами в «Налаштуваннях»."
     : "Роль призначила адміністраторка школи. Ви керуєте своїми групами й учнями та можете редагувати спільну бібліотеку уроків і граматики."}</span></div>`;
 }
+const ALL_VIEWS = new Set(["codes", "hw", "hwctl", "materials", "awards", "rank", "settings"]);
+const langPill = l => `<span class="pill soft">${SPACES[l]?.seal || ""} ${esc(SPACES[l]?.name || "")}</span>`;
+function allViewWrap(name){
+  if (name === "codes") return codesView();
+  if (name === "hw"){
+    // editing a homework happens inside its own language (lessons, grammar and groups of that language)
+    if (S.hwEdit){ const h = S.hwEdit.id && S.hw?.[S.hwEdit.id]; const l = h ? hwLang(h) : "zh"; S.allLang = false; S.space = l; setLangCur(l); return hwStaffView(); }
+    return hwStaffView();
+  }
+  if (name === "hwctl") return hwCtlView();
+  if (name === "materials") return matView();
+  if (name === "awards") return tAwardsView();
+  if (name === "settings") return settingsView();
+  if (name === "rank"){ if (!S.rank.scope || S.rank.scope === "all") S.rank.scope = "school"; return `<div class="stack">${backCrumb("Рейтинг")}${rankView(true, "")}</div>`; }
+  return spacePickView();
+}
+function allToolsHtml(){
+  const T = Object.values(S.teachers), C = Object.values(S.classes), H = Object.values(S.hw || {});
+  const card = (v, g, b, t) => `<button class="excard" data-act="allGo" data-arg="${v}"><span class="glyph">${g}</span><b>${b}</b><span class="small muted">${t}</span></button>`;
+  const langCard = (v, g, b, t) => `<div class="excard" style="cursor:default"><span class="glyph">${g}</span><b>${b}</b><span class="small muted">${t}</span><div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px">${["zh", "ko", "ja"].map(l => `<button class="btn sm" data-act="allOpen" data-arg="${l}:${v}">${SPACES[l].seal} ${SPACES[l].name.replace(" мова", "")}</button>`).join("")}</div></div>`;
+  return `<section><div class="sh"><h2>Інструменти · усі мови</h2><span class="small muted">китайська, корейська й японська разом</span></div>
+    <div class="exgrid">
+      ${card("codes", "码", "Коди для входу", `Коди всіх ${C.length} груп і учнів трьох мов з готовими повідомленнями.`)}
+      ${card("hw", "作", "Домашні завдання", `Усі ДЗ школи (${H.length}) — перегляд і перевірка. Нове ДЗ задається всередині мови.`)}
+      ${card("hwctl", "查", "Контроль ДЗ", "Хто не здав вчасно і скільки відповідей чекає перевірки — у всіх викладачів.")}
+      ${card("materials", "材", "Матеріали", "Посилання всіх викладачів у папках за рівнями HSK, 급 і JLPT.")}
+      ${card("awards", "奖", "Нагороди викладачів", `Усі ${T.length} викладачів і «Викладач місяця» — один на всю школу.`)}
+      ${card("rank", "榜", "Рейтинг", "Спільний рейтинг усіх учнів школи з фільтром за викладачем і групою.")}
+      ${langCard("exlab", "练", "Вправи", "Вправи й ігри — оберіть мову.")}
+      ${langCard("library", "课", "Бібліотека", "Лексика й граматика — оберіть мову.")}
+      ${card("settings", "设", "Налаштування", "Назва школи, команда й доступи.")}
+    </div></section>`;
+}
 function spacePickView(){
   const school = S.settings.school || "Asianish School";
   const card = id => { const p = SPACES[id];
@@ -2313,6 +2351,7 @@ function spacePickView(){
   return `<div class="stack">
     <section class="hero"><div><div class="eyebrow">Кабінет адміністратора</div><h1>${esc(school)}</h1><p class="sub">Оберіть мовний простір — у кожному свої викладачі, групи, уроки й рейтинг.</p></div></section>
     <div class="spgrid">${["zh", "ko", "ja"].map(card).join("")}</div>
+    ${S.role === "admin" ? allToolsHtml() : ""}
     <section class="stack" style="gap:10px"><div class="sh"><h2>📌 Дошка оголошень</h2>${boardItems().length ? `<button class="link small" data-act="bdOpen">Усі оголошення (${boardItems().length})</button>` : ""}</div>
       <p class="small muted" style="margin:0">Напишіть новину — її побачать учні й викладачі (усі або лише обрана мова) вгорі свого кабінету й у дзвіночку.</p>
       ${S.boardMissing ? `<div class="note"><span>!</span><span>Дошка ще не підключена: один раз запустіть файл asianish-board.sql у Supabase → SQL Editor.</span></div>` : ""}
@@ -4121,7 +4160,7 @@ function tMonthScore(t, m){
   const parts = {pts: Math.round(pts / n), act: Math.round(100 * act / n), care: Math.round(50 * com / n), content: Math.min(10, content) * 5};
   return {...parts, n, score: parts.pts + parts.act + parts.care + parts.content};
 }
-function tomBoard(m){ return teachersSorted().map(t => ({t, r: tMonthScore(t, m)})).filter(x => x.r && x.r.score > 0).sort((a, b) => b.r.score - a.r.score); }
+function tomBoard(m){ return teachersAll().map(t => ({t, r: tMonthScore(t, m)})).filter(x => x.r && x.r.score > 0).sort((a, b) => b.r.score - a.r.score); }
 function tomWinners(k){ return monthList(k + 1).slice(1).map(m => ({m, w: tomBoard(m)[0] || null})); }
 function tMetrics(t){
   const studs = tStuds(t.id), cs = classesOf(t.id), d = today(), cm = curMonth(), pm = prevMonth();
@@ -4199,7 +4238,7 @@ function tomTable(m, mine){
   const b = tomBoard(m);
   if (!b.length) return `<p class="small muted">Поки що немає даних за ${monthName(m).toLowerCase()}: потрібні хоча б 2 учні та їхні заняття на платформі.</p>`;
   return `<div class="tablewrap"><table><thead><tr><th>#</th><th>Викладач</th><th class="n">Бали учнів</th><th class="n">Активні учні</th><th class="n">Відгуки</th><th class="n">Матеріали</th><th class="n">Разом</th></tr></thead><tbody>
-    ${b.map((x, i) => `<tr ${x.t.id === mine ? 'class="me"' : ""}><td>${i < 3 ? ["🥇", "🥈", "🥉"][i] : i + 1}</td><td><b>${esc(x.t.name)}</b><div class="small muted">${x.r.n} ${plural(x.r.n, "учень", "учні", "учнів")}</div></td>
+    ${b.map((x, i) => `<tr ${x.t.id === mine ? 'class="me"' : ""}><td>${i < 3 ? ["🥇", "🥈", "🥉"][i] : i + 1}</td><td><b>${esc(x.t.name)}</b> <span class="pill soft">${esc(SPACES[tLang(x.t)]?.name || "")}</span><div class="small muted">${x.r.n} ${plural(x.r.n, "учень", "учні", "учнів")}</div></td>
       <td class="n">${x.r.pts}</td><td class="n">${x.r.act}</td><td class="n">${x.r.care}</td><td class="n">${x.r.content}</td><td class="n"><b>${x.r.score}</b></td></tr>`).join("")}</tbody></table></div>`;
 }
 const TOM_RULES = `<details class="small muted" style="margin-top:8px"><summary>Як рахуються бали</summary><p style="margin:6px 0 0;max-width:70ch">Усе рахується <b>на одного учня</b>, тому мала група не програє великій. Бали учнів — середня кількість балів, які учні заробили на платформі за місяць. Активні учні — до 100: частка учнів, що займалися щонайменше 6 днів за місяць. Відгуки — до 50: частка учнів із щомісячним коментарем. Матеріали — по 5 за кожен доданий матеріал чи «Лексику з уроку» (до 50). Беруть участь викладачі з 2+ учнями.</p></details>`;
@@ -4252,7 +4291,7 @@ const hwSafeUrl = u => { u = String(u || "").trim(); if (!u) return ""; if (!/^h
 const hwHost = u => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch(e){ return "Посилання"; } };
 const hwText = s => esc(s || "").replace(/(https?:\/\/[^\s<]+[^\s<.,;:!?)\]'"])/g, m => `<a href="${m}" target="_blank" rel="noopener noreferrer">${m}</a>`).replace(/\n/g, "<br>");
 const hwLang = h => { const c = S.classes[(h.classIds || [])[0]] || S.classes[S.students[(h.sids || [])[0]]?.classId]; return c ? clsLang(c) : "zh"; };
-const hwAll = () => Object.values(S.hw || {}).filter(h => !staffUI() || hwLang(h) === LANG_CUR).sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")) || (b.createdAt || 0) - (a.createdAt || 0));
+const hwAll = () => Object.values(S.hw || {}).filter(h => !staffUI() || allL() || hwLang(h) === LANG_CUR).sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")) || (b.createdAt || 0) - (a.createdAt || 0));
 const hwKey = (hid, sid) => hid + ":" + sid;
 const hwSub = (hid, sid) => S.hwsub?.[hwKey(hid, sid)] || null;
 const hwFb = (hid, sid) => S.hwfb?.[hwKey(hid, sid)] || null;
@@ -4338,7 +4377,17 @@ function hwItem(h, classId){
 }
 // homework of one class (group or individual student): set to the whole class or to some of its students
 const hwOfClass = (list, cid) => list.filter(h => (h.classIds || []).includes(cid) || (h.sids || []).some(id => S.students[id]?.classId === cid));
+function hwListAll(){
+  const list = hwVisibleForStaff("");
+  const secs = ["zh", "ko", "ja"].map(l => { const L = list.filter(h => hwLang(h) === l); if (!L.length) return "";
+    return `<section class="stack" style="gap:10px"><div class="sh"><h3>${SPACES[l].seal} ${SPACES[l].name}</h3><span class="small muted num">${L.length} ДЗ</span><button class="btn sm" data-act="allOpen" data-arg="${l}:hw">+ Нове ДЗ у цій мові</button></div>
+      <div class="stack" style="gap:8px">${L.map(h => hwItem(h, "")).join("")}</div></section>`; }).join("");
+  return `<p class="small muted" style="margin:0">Усі ДЗ школи за мовами. Відкрийте ДЗ, щоб перевірити відповіді. Нове ДЗ задається всередині мови — кнопка «+ Нове ДЗ у цій мові».</p>
+    ${secs || emptyBox("作", "Ще немає домашніх завдань", "Задайте ДЗ всередині потрібної мови.")}
+    ${secs ? "" : `<div class="row" style="gap:8px">${["zh", "ko", "ja"].map(l => `<button class="btn sm" data-act="allOpen" data-arg="${l}:hw">${SPACES[l].seal} ${SPACES[l].name}</button>`).join("")}</div>`}`;
+}
 function hwListStaff(classId){
+  if (allL() && !classId) return hwListAll();
   if (S.hwMissing) return `<div class="note"><span>⚠</span><span><b>Розділ ДЗ ще не підключено до бази.</b> Адміністраторці потрібно один раз запустити SQL для домашніх завдань у Supabase (SQL Editor → Run), а потім оновити сторінку.</span></div>`;
   const list = hwVisibleForStaff(classId);
   const head = `<div class="spread"><span class="small muted">Учні відповідають текстом, фото або посиланням. Кожен учень бачить лише свої ДЗ.</span><button class="btn primary" data-act="hwNew" data-arg="${esc(classId || "")}">+ Нове ДЗ</button></div>`;
@@ -7154,7 +7203,7 @@ function rankView(teacher, classId){
   const meIdx = !teacher && S.store === "remote" ? list.findIndex(x => x.id === S.uid) : -1;
   const periods = [["all","За весь час"],["month","Цей місяць"],["week","Цей тиждень"]];
   let scopeCtl = "";
-  if (teacher) scopeCtl = `<select class="input" style="width:auto;min-height:38px" data-chg="rankscope" aria-label="Кого показати"><option value="all" ${scope === "all" ? "selected" : ""}>${SPACES[LANG_CUR].seal} Уся ${LNAME()}а (усі учні)</option><option value="school" ${scope === "school" ? "selected" : ""}>Уся школа (усі мови)</option>
+  if (teacher) scopeCtl = `<select class="input" style="width:auto;min-height:38px" data-chg="rankscope" aria-label="Кого показати">${allL() ? "" : `<option value="all" ${scope === "all" ? "selected" : ""}>${SPACES[LANG_CUR].seal} Уся ${LNAME()}а (усі учні)</option>`}<option value="school" ${scope === "school" ? "selected" : ""}>Уся школа (усі мови)</option>
     ${admin ? teachersSorted().map(t => `<option value="t:${esc(t.id)}" ${scope === "t:" + t.id ? "selected" : ""}>Учні: ${esc(t.name)}</option>`).join("") : myT ? `<option value="t:${esc(myT)}" ${scope === "t:" + myT ? "selected" : ""}>Мої учні</option>` : ""}
     <optgroup label="Ліги за рівнем">${Object.entries(LEAGUES).map(([k, L]) => `<option value="lg:${k}" ${scope === "lg:" + k ? "selected" : ""}>Ліга ${L.name}${L.lv.length > 1 ? "+" : ""}</option>`).join("")}</optgroup>
     ${myCls.map(c => `<option value="${esc(c.id)}" ${scope === c.id ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select>`;
@@ -7273,8 +7322,10 @@ const ACT = {
     S.view = {name: "home"}; render(); window.scrollTo(0, 0);
   },
   spMenu(){ S.spMenu = !S.spMenu; renderWho(); },
-  spaces(){ S.spMenu = false; S.gram = null; S.space = ""; try { localStorage.setItem("asianish.space", ""); } catch(e){} S.view = {name: "home"}; S.modal = null; render(); window.scrollTo(0, 0); },
-  space(id){ if (!SPACES[id]) return; S.spMenu = false; S.gram = null; S.space = id; try { localStorage.setItem("asianish.space", id); } catch(e){} S.view = {name: "home"}; S.modal = null; render(); window.scrollTo(0, 0); },
+  allGo(v){ if (S.role !== "admin" || !ALL_VIEWS.has(v)) return; S.allLang = true; S.spMenu = false; S.gram = null; S.space = ""; S.hwEdit = null; S.hwSel = null; S.view = {name: v}; S.modal = null; render(); window.scrollTo(0, 0); },
+  allOpen(a){ const [l, v] = String(a).split(":"); if (!SPACES[l]) return; S.allLang = false; ACT.space(l); S.view = {name: v || "home"}; if (v === "hw"){ S.hwSel = null; S.hwEdit = null; } render(); window.scrollTo(0, 0); },
+  spaces(){ S.allLang = false; S.spMenu = false; S.gram = null; S.space = ""; try { localStorage.setItem("asianish.space", ""); } catch(e){} S.view = {name: "home"}; S.modal = null; render(); window.scrollTo(0, 0); },
+  space(id){ if (!SPACES[id]) return; S.allLang = false; S.spMenu = false; S.gram = null; S.space = id; try { localStorage.setItem("asianish.space", id); } catch(e){} S.view = {name: "home"}; S.modal = null; render(); window.scrollTo(0, 0); },
   openTeacher(id){ S.gram = null; S.view = {name: "teacher", tid: id}; render(); window.scrollTo(0, 0); },
   newTeacher(){ S.modal = {kind: "teacher", id: null}; renderModal(); },
   editTeacher(id){ S.modal = {kind: "teacher", id}; renderModal(); },
