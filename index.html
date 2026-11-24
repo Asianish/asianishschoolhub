@@ -1471,11 +1471,23 @@ const CODE_CYR = {"А":"A","В":"B","Е":"E","К":"K","М":"M","Н":"H","О":"O"
 const codeNorm = s => String(s || "").toUpperCase().replace(/[А-ЯІЇЄҐ]/g, ch => CODE_CYR[ch] || ch).replace(/[^A-Z0-9]/g, "");
 const CODE_KB = (() => { const a = "йцукенгшщзхїфівапролджєячсмитьбю", b = "qwertyuiop[]asdfghjkl;'zxcvbnm,."; const m = {}; for (let i = 0; i < a.length; i++) m[a[i]] = b[i]; m["ы"] = "s"; m["э"] = "'"; m["ъ"] = "]"; return m; })();
 const codeKb = s => String(s || "").toLowerCase().replace(/./g, ch => CODE_KB[ch] || ch).toUpperCase().replace(/[^A-Z0-9]/g, "");
-const classByCode = raw => { const all = Object.values(S.classes || {}); const cands = [...new Set([codeNorm(raw), codeNorm(String(raw || "").replace(/[Вв]/g, "V")), codeKb(raw)].filter(Boolean))];
+const codeCands = raw => [...new Set([codeNorm(raw), codeNorm(String(raw || "").replace(/[Вв]/g, "V")), codeKb(raw)].filter(Boolean))];
+// a student without a group cannot read the classes table (codes are hidden from strangers), so the code is checked on the server
+async function classByCodeRemote(raw){
+  const sb = window.ASIANISH_SB; if (!sb?.rpc) return null;
+  const c = codeCands(raw), codes = [...new Set(c.flatMap(k => [k, k.replace(/0/g, "O"), k.replace(/O/g, "0")]))];
+  try { const {data, error} = await sb.rpc("asianish_find_class", {codes}); if (error || !data) return null; const r = Array.isArray(data) ? data[0] : data; return r && r.id ? {id: r.id, code: r.code, remote: true} : null; } catch(e){ return null; }
+}
+const classByCode = raw => { const all = Object.values(S.classes || {}); const cands = codeCands(raw);
   for (const k of cands){ const c = all.find(c => codeNorm(c.code) === k) || all.find(c => codeNorm(c.code).replace(/0/g, "O") === k.replace(/0/g, "O")); if (c) return c; }
   return null; };
 const myTeacherCardByEmail = () => { const em = String(window.ASIANISH_ME?.email || "").toLowerCase(); if (!em) return null;
-  return Object.values(S.teachers || {}).find(t => t && t.email && String(t.email).toLowerCase() === em) || null; };
+  return Object.values(S.teachers || {}).find(t => t && t.email && String(t.email).toLowerCase() === em) || (S.tEmailChk ? {name: S.tEmailChk} : null); };
+// teacher cards are hidden from people without a group, so a new teacher's e-mail is checked on the server
+function teacherEmailCheck(){
+  if (S.tEmailChk !== undefined || !S.uid || !window.ASIANISH_SB?.rpc) return; S.tEmailChk = null;
+  window.ASIANISH_SB.rpc("asianish_teacher_email").then(r => { if (r && !r.error && r.data){ S.tEmailChk = String(r.data); render(); } }).catch(() => {});
+}
 const code6 = () => { const A = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let s = ""; for (let i = 0; i < 6; i++) s += A[Math.floor(Math.random() * A.length)]; return s; };
 const dstr = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 const today = () => dstr(new Date());
@@ -1929,7 +1941,9 @@ function syncMe(){
   if (remote){
     if (!S.me || S.store !== "remote"){ S.me = clone(remote); S.store = "remote"; return; }
     if ((remote.rev || 0) > (S.me.rev || 0) && !saving) S.me = clone(remote);
-    if (remote.assignAt && remote.assignAt > (S.me.assignAt || 0)){ S.me.classId = remote.classId; S.me.assignAt = remote.assignAt; }
+    if (remote.assignAt && remote.assignAt > (S.me.assignAt || 0)){ const was = S.me.classId; S.me.classId = remote.classId; S.me.assignAt = remote.assignAt;
+      // the administrator has just placed a waiting student into a group: reload so the lessons of the group load
+      if (!was && remote.classId && !S.lessonsLoadedFor){ S.lessonsLoadedFor = 1; setTimeout(() => location.reload(), 400); } }
     if (remote.lvoAt && remote.lvoAt !== S.me.lvoAt){ S.me.lvo = remote.lvo || ""; if (remote.level) S.me.level = remote.level; S.me.lvoAt = remote.lvoAt; S.level = null; }
     return;
   }
@@ -1995,7 +2009,7 @@ function levelBar(ctx, what){
 const N_DAYS = 21, DAY_MS = 864e5;
 const dayStart = d => Date.parse((d || today()) + "T00:00:00");
 const ago = t => { if (t % DAY_MS === dayStart(today()) % DAY_MS && new Date(t).getHours() === 0 && new Date(t).getMinutes() === 0) return t >= dayStart(today()) ? "сьогодні" : fmtDate(dstr(new Date(t))); const m = Math.round((Date.now() - t) / 6e4); if (m < 1) return "щойно"; if (m < 60) return m + " хв"; const h = Math.round(m / 60); if (h < 24) return h + " год"; return fmtDate(dstr(new Date(t))); };
-function bellOn(){ if (S.phase !== "ready" || S.testAs) return false; if (staffUI()) return !adminSpaces() || S.space === "zh"; return !!S.me && !!S.uid; }
+function bellOn(){ if (S.phase !== "ready" || S.testAs) return false; if (staffUI()) return true; return !!S.me && !!S.uid && !isWaiting(); }
 function bellSeenGet(){
   if (!staffUI()) return S.me?.nSeen || (S.me ? Date.now() - 3 * DAY_MS : 0);
   try { const v = +localStorage.getItem("asianish.nseen." + (S.uid || "x")); if (v) return v; } catch(e){}
@@ -2045,8 +2059,8 @@ function bellItems(){
     for (const [id, st] of Object.entries(S.students)){
       if (!st.joinedAt || isStaffId(id)) continue;
       const c = classOf(st), t = Date.parse(st.joinedAt + "T09:00:00");
-      if (!c) add({id: "join0:" + id, t, g: "新", tone: "info", k: "Новий учень без групи", title: st.name || "Учень", meta: ["Оберіть йому групу"], act: "home"});
-      else if (inScope(st)) add({id: "join:" + id, t, g: "新", tone: "info", k: "Новий учень у групі", title: st.name || "Учень", meta: [c.name], act: "c:" + c.id});
+      if (!c){ if (admin) add({id: "join0:" + id, t, g: "新", tone: "warn", k: "Новий учень без коду", title: st.name || "Учень", meta: ["Перевірте й призначте групу"], act: "nocode"}); }
+      else if (inScope(st) && (admin || st.joinBy !== "admin")) add({id: "join:" + id, t, g: "新", tone: "info", k: "Новий учень у групі", title: st.name || "Учень", meta: [c.name], act: "c:" + c.id});
     }
     if (admin){
       const {wait} = hwCtlData();
@@ -2139,7 +2153,7 @@ const orphanClasses = () => classesSorted().filter(c => !c.teacherId || !S.teach
 const studentTid = st => { const c = classOf(st); return c && S.teachers[c.teacherId] ? c.teacherId : ""; };
 const studentsOf = tid => Object.entries(S.students).filter(([, st]) => studentTid(st) === tid && st.classId && S.classes[st.classId] && stLang(st) === clsLang(S.classes[st.classId]));
 const isStaffId = id => Object.values(S.teachers || {}).some(t => t.uid === id) || ["admin", "teacher"].includes(S.staff?.[id]?.role);
-const unassignedStudents = () => Object.entries(S.students).filter(([id, st]) => (!st.classId || !S.classes[st.classId]) && !isStaffId(id) && (!st.level || stLang(st) === LANG_CUR));
+const unassignedStudents = () => S.role !== "admin" ? [] : Object.entries(S.students).filter(([id, st]) => (!st.classId || !S.classes[st.classId]) && !isStaffId(id) && (!st.level || stLang(st) === LANG_CUR));
 // Which teacher's cabinet is on screen: admin picks one; a teacher always sees her own.
 function ctxTid(){
   if (S.role === "admin") return S.view.tid || (S.view.name === "class" ? S.classes[S.view.id]?.teacherId || "" : "");
@@ -2323,6 +2337,21 @@ function allViewWrap(name){
   if (name === "rank"){ if (!S.rank.scope || S.rank.scope === "all") S.rank.scope = "school"; return `<div class="stack">${backCrumb("Рейтинг")}${rankView(true, "")}</div>`; }
   return spacePickView();
 }
+// ---- students who registered without a code: only the administrator sees them and places them into a group
+function nocodeHtml(){
+  const un = Object.entries(S.students).filter(([id, st]) => st && !st.deleted && (!st.classId || !S.classes[st.classId]) && !isStaffId(id) && st.name)
+    .sort((a, b) => String(b[1].joinedAt || "").localeCompare(String(a[1].joinedAt || "")));
+  if (!un.length) return "";
+  const opts = `<option value="">Призначити в групу чи до викладача…</option>` + ["zh", "ko", "ja"].map(l => Object.values(S.teachers).filter(t => tLang(t) === l).sort((a, b) => String(a.name).localeCompare(b.name, "uk"))
+    .map(t => { const cs = classesOf(t.id); return cs.length ? `<optgroup label="${esc(SPACES[l].seal + " " + t.name)}">${cs.map(c => `<option value="${esc(c.id)}">${esc(c.name)} · ${esc(lvName(c.course || "HSK1"))}${c.kind === "individual" ? " · індив." : ""}</option>`).join("")}</optgroup>` : ""; }).join("")).join("");
+  const rows = un.map(([id, st]) => `<tr><td><b>${esc(st.name)}</b>${st.alias ? `<div class="small muted">псевдонім: ${esc(st.alias)}</div>` : ""}</td>
+      <td>${st.joinedAt ? fmtDate(st.joinedAt) : "—"}</td><td>${st.level ? esc(lvName(st.level)) + " " + langPill(lvLang(st.level)) : "не вказав"}</td>
+      <td><select class="input" style="min-height:34px;padding:4px 8px;width:auto;max-width:280px" data-chg="assign" data-id="${esc(id)}" aria-label="Група для ${esc(st.name)}">${opts}</select></td>
+      <td><button class="btn sm ${S.delStu === id ? "danger" : "ghost"}" data-act="delStu" data-arg="${esc(id)}">${S.delStu === id ? "Точно видалити?" : "Видалити"}</button></td></tr>`).join("");
+  return `<section id="nocode" class="stack" style="gap:10px"><div class="sh"><h2>Нові учні без коду</h2><span class="pill warn num">${un.length}</span></div>
+    <p class="small muted" style="margin:0;max-width:72ch">Зареєструвалися без коду від викладача. Їх бачите лише ви: викладачі не бачать їх і не отримують сповіщень, доки ви не призначите людину в групу. Незнайомих можна видалити.</p>
+    <div class="tablewrap"><table><thead><tr><th>Ім'я</th><th>Зареєструвався</th><th>Рівень (сам обрав)</th><th>Куди призначити</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
+}
 function allToolsHtml(){
   const T = Object.values(S.teachers), C = Object.values(S.classes), H = Object.values(S.hw || {});
   const card = (v, g, b, t) => `<button class="excard" data-act="allGo" data-arg="${v}"><span class="glyph">${g}</span><b>${b}</b><span class="small muted">${t}</span></button>`;
@@ -2351,7 +2380,7 @@ function spacePickView(){
   return `<div class="stack">
     <section class="hero"><div><div class="eyebrow">Кабінет адміністратора</div><h1>${esc(school)}</h1><p class="sub">Оберіть мовний простір — у кожному свої викладачі, групи, уроки й рейтинг.</p></div></section>
     <div class="spgrid">${["zh", "ko", "ja"].map(card).join("")}</div>
-    ${S.role === "admin" ? allToolsHtml() : ""}
+    ${S.role === "admin" ? nocodeHtml() + allToolsHtml() : ""}
     <section class="stack" style="gap:10px"><div class="sh"><h2>📌 Дошка оголошень</h2>${boardItems().length ? `<button class="link small" data-act="bdOpen">Усі оголошення (${boardItems().length})</button>` : ""}</div>
       <p class="small muted" style="margin:0">Напишіть новину — її побачать учні й викладачі (усі або лише обрана мова) вгорі свого кабінету й у дзвіночку.</p>
       ${S.boardMissing ? `<div class="note"><span>!</span><span>Дошка ще не підключена: один раз запустіть файл asianish-board.sql у Supabase → SQL Editor.</span></div>` : ""}
@@ -2576,7 +2605,7 @@ function boardView(){
 function studentTable(entries, tid){
   if (!entries.length) return emptyBox("学", "Поки що немає студентів", "Студенти з'являться тут після реєстрації з кодом цієї групи.");
   const o = (c, id) => `<option value="${esc(c.id)}" ${c.id === id ? "selected" : ""}>${esc(c.name)}</option>`;
-  const opts = id => `<option value="">— без групи —</option>` + (tid ? classesOf(tid).map(c => o(c, id)).join("")
+  const opts = id => (S.role === "admin" ? `<option value="">— без групи —</option>` : "") + (tid ? classesOf(tid).map(c => o(c, id)).join("")
     : teachersSorted().map(t => classesOf(t.id).length ? `<optgroup label="${esc(t.name)}">${classesOf(t.id).map(c => o(c, id)).join("")}</optgroup>` : "").join("") + (orphanClasses().length ? `<optgroup label="Без викладача">${orphanClasses().map(c => o(c, id)).join("")}</optgroup>` : ""));
   const rows = entries.map(([id, st]) => {
     const s = statsOf(st, availLessons(st, classOf(st))), w = rankRow(st, "week");
@@ -3479,6 +3508,7 @@ function teamHtml(){
 // =====================================================================
 function registerView(){
   const noId = !S.uid;
+  teacherEmailCheck();
   const tw = myTeacherCardByEmail();
   if (tw) return `<div class="reg"><div class="stack"><div class="big">师</div><div><div class="eyebrow">Кабінет викладача</div><h1>${esc(tw.name)}, вітаємо!</h1></div>
     <p class="muted" style="max-width:46ch">Ваша пошта вже вписана в картку викладача. Профіль студента створювати не потрібно. Доступ викладача вмикається автоматично, щойно адміністраторка відкриє сайт, — зазвичай це займає кілька хвилин.</p>
@@ -3506,7 +3536,25 @@ function registerView(){
   </div>`;
 }
 
+// a person who registered without a teacher's code sees only this page until the administrator places them into a group
+const isWaiting = () => !!S.me && S.store === "remote" && !S.testAs && !S.me.classId && !S.isTeacher;
+function waitView(){
+  const nm = String(S.me?.name || "").split(" ")[0];
+  return `<div class="reg"><div class="stack" style="max-width:520px">
+      <div class="big">待</div>
+      <div><div class="eyebrow">Asianish School</div><h1>${dL("Дякуємо" + (nm ? ", " + esc(nm) : "") + "!", "Thank you" + (nm ? ", " + esc(nm) : "") + "!")}</h1></div>
+      <p class="muted">${dL("Ваш профіль створено. Адміністратор школи перевірить реєстрацію й додасть вас до групи чи до викладача — тоді тут відкриється ваш навчальний кабінет.", "Your profile has been created. The school administrator will check your registration and add you to a group or a teacher — then your learning space will open here.")}</p>
+      <form class="panel form stack" data-form="waitCode" style="gap:10px">
+        <label for="wc-code"><b>${dL("Маєте код від викладача?", "Have a code from your teacher?")}</b></label>
+        <input class="input" id="wc-code" name="code" autocomplete="off" autocapitalize="characters" placeholder="${dL("Наприклад: AB12CD", "For example: AB12CD")}" required>
+        <p class="err" id="wc-err" hidden></p>
+        <button class="btn primary" type="submit" id="wc-btn">${dL("Увійти з кодом", "Join with the code")}</button>
+      </form>
+      <p class="small muted">${dL("Якщо коду немає — нічого робити не потрібно, просто зачекайте. Сторінка відкриється сама, щойно вас додадуть.", "No code? Nothing to do — just wait. This page will open by itself once you are added.")}</p>
+    </div></div>`;
+}
 function studentView(){
+  if (isWaiting()) return waitView();
   const c = classOf(S.me);
   const storeNote = S.store === "test" ? `<div class="note info" style="border:1px solid var(--gold)"><span>🧪</span><span><b>Режим студента (тест).</b> Ви бачите кабінет так, як його бачить студент ${S.classes[S.testAs.classId]?.kind === "individual" ? "" : "групи "}«${esc(S.classes[S.testAs.classId]?.name || "")}». Усе працює, але нічого не зберігається і не потрапляє в рейтинг. <button class="link" data-act="exitTest">Вийти</button></span></div>`
     : S.store === "local" ? `<div class="note"><span>📱</span><span><b>Прогрес зберігається лише на цьому пристрої</b> і не потрапляє в рейтинг. Попросіть викладачку надати вам доступ до платформи з роллю <b>Contributor</b>, і після оновлення сторінки профіль синхронізується.</span></div>` : "";
@@ -7358,10 +7406,12 @@ const ACT = {
     if (k === "t"){ ACT.hwOpenT(id); return; }
     if (k === "c"){ S.view = {name: "class", id}; render(); window.scrollTo(0, 0); return; }
     if (k === "ctl"){ S.view = {name: "hwctl"}; render(); window.scrollTo(0, 0); return; }
+    if (k === "nocode"){ ACT.nocode(); return; }
     if (k === "board"){ ACT.bdOpen(); setTimeout(() => { const n = document.getElementById("bd-" + id); if (n) n.scrollIntoView({block: "start", behavior: "smooth"}); }, 60); return; }
     S.view = {name: "home"}; render(); window.scrollTo(0, 0);
   },
   spMenu(){ S.spMenu = !S.spMenu; renderWho(); },
+  nocode(){ S.allLang = false; ACT.spaces(); setTimeout(() => document.getElementById("nocode")?.scrollIntoView({block: "start", behavior: "smooth"}), 80); },
   allGo(v){ if (S.role !== "admin" || !ALL_VIEWS.has(v)) return; S.allLang = true; S.spMenu = false; S.gram = null; S.space = ""; S.hwEdit = null; S.hwSel = null; S.view = {name: v}; S.modal = null; if (v === "rank") cheer(); render(); window.scrollTo(0, 0); },
   allOpen(a){ const [l, v] = String(a).split(":"); if (!SPACES[l]) return; S.allLang = false; ACT.space(l); S.view = {name: v || "home"}; if (v === "hw"){ S.hwSel = null; S.hwEdit = null; } render(); window.scrollTo(0, 0); },
   spaces(){ S.allLang = false; S.spMenu = false; S.gram = null; S.space = ""; try { localStorage.setItem("asianish.space", ""); } catch(e){} S.view = {name: "home"}; S.modal = null; render(); window.scrollTo(0, 0); },
@@ -7767,14 +7817,14 @@ const FORM = {
     const name = fd.get("name").trim(); const code = String(fd.get("code") || "").trim();
     if (myTeacherCardByEmail()){ err.textContent = "Ця пошта вписана в картку викладача — профіль студента вам не потрібен. Оновіть сторінку трохи пізніше."; err.hidden = false; return; }
     let classId = "";
-    if (code){ const c = classByCode(code); if (!c){ err.textContent = "Такого коду немає. Перевірте літери (код пишеться латиницею) або запитайте викладачку ще раз."; err.hidden = false; return; } classId = c.id; }
+    if (code){ let c = classByCode(code); if (!c) c = await classByCodeRemote(code); if (!c){ err.textContent = "Такого коду немає. Перевірте літери (код пишеться латиницею) або запитайте викладачку ще раз."; err.hidden = false; return; } classId = c.id; var joinCode = c.code || ""; }
     else if (fd.get("nocode") !== "on"){ err.textContent = "Введіть код від викладачки. Якщо коду ще немає, поставте позначку «У мене поки немає коду»."; err.hidden = false; return; }
     if (!name){ err.textContent = "Вкажіть ім'я"; err.hidden = false; return; }
-    const me = newProfile({name, alias: fd.get("alias").trim(), useAlias: fd.get("useAlias") === "on", classId, level: fd.get("level")}); if (classId) me.assignAt = Date.now();
+    const me = newProfile({name, alias: fd.get("alias").trim(), useAlias: fd.get("useAlias") === "on", classId, level: fd.get("level")}); if (classId){ me.assignAt = Date.now(); me.joinCode = joinCode; me.joinBy = "code"; }
     btn.disabled = true; btn.textContent = "Створюю…";
     if (S.uid){
-      try { await S.db.doc("students/" + S.uid).set(me); S.me = me; S.store = "remote"; }
-      catch(e){ S.me = me; S.store = "local"; lsSet(localKey(), me); }
+      try { await S.db.doc("students/" + S.uid).set(me); S.me = me; S.store = "remote"; if (classId && !S.classes[classId]){ location.reload(); return; } }
+      catch(e){ if (classId && e && e.code === "permission_denied"){ btn.disabled = false; btn.textContent = "Створити профіль"; err.textContent = "Код не підійшов. Перевірте його ще раз або запитайте викладачку."; err.hidden = false; return; } S.me = me; S.store = "local"; lsSet(localKey(), me); }
     } else { S.me = me; S.store = "local"; lsSet(localKey(), me); }
     S.view = {tab: "dash"}; render(); window.scrollTo(0, 0);
   },
@@ -7797,9 +7847,17 @@ const FORM = {
     if (me.bankOwn.length >= 300){ toast("У банці вже 300 власних слів"); return; }
     me.bankOwn.push({id: rid("own"), h, p: fd.get("p").trim(), uk}); me.bankAdded = (me.bankAdded || 0) + 1; saveMe(); toast("Слово додано до банки"); render();
   },
+  async waitCode(f){
+    const fd = new FormData(f), err = $("#wc-err"), btn = $("#wc-btn"), code = String(fd.get("code") || "").trim(); if (!code || !S.me || !S.uid) return;
+    btn.disabled = true; err.hidden = true;
+    let c = classByCode(code); if (!c) c = await classByCodeRemote(code);
+    if (!c){ btn.disabled = false; err.textContent = dL("Такого коду немає. Перевірте літери (код пишеться латиницею) або запитайте викладача ще раз.", "There is no such code. Check the letters or ask your teacher again."); err.hidden = false; return; }
+    try { await S.db.doc("students/" + S.uid).update({classId: c.id, joinCode: c.code || "", joinBy: "code", assignAt: Date.now()}); location.reload(); }
+    catch(e){ btn.disabled = false; err.textContent = dL("Код не підійшов. Перевірте його ще раз або запитайте викладача.", "The code did not work. Check it or ask your teacher."); err.hidden = false; }
+  },
   profile(f){
     const fd = new FormData(f), err = $("#pf-err"); const code = fd.get("code").trim().toUpperCase();
-    if (code){ const c = Object.values(S.classes).find(c => (c.code || "").toUpperCase() === code); if (!c){ err.textContent = "Такого коду немає."; err.hidden = false; return; } S.me.classId = c.id; S.me.assignAt = Math.max(Date.now(), (S.students[S.uid]?.assignAt || 0) + 1); S.cards = null; S.ex = null; S.level = null; }
+    if (code){ const c = Object.values(S.classes).find(c => (c.code || "").toUpperCase() === code); if (!c){ err.textContent = "Такого коду немає."; err.hidden = false; return; } S.me.classId = c.id; S.me.joinCode = c.code || ""; S.me.joinBy = "code"; S.me.assignAt = Math.max(Date.now(), (S.students[S.uid]?.assignAt || 0) + 1); S.cards = null; S.ex = null; S.level = null; }
     S.me.name = fd.get("name").trim() || S.me.name; S.me.alias = fd.get("alias").trim(); S.me.useAlias = fd.get("useAlias") === "on"; S.me.level = fd.get("level");
     saveMe(); toast("Профіль збережено"); render();
   }
@@ -7910,7 +7968,8 @@ document.addEventListener("change", async e => {
   if (c === "stlevel"){ const id = el.dataset.id, st = S.students[id], v = el.value, upd = {lvo: v, lvoAt: Date.now()};
     if (!classOf(st) && v) upd.level = v;
     try { await S.db.doc("students/" + id).update(upd); Object.assign(st, upd); toast(v ? "Рівень студента: " + lvName(v) : "Рівень — як у групі"); render(); } catch(err){ toast("Не вдалося змінити рівень"); } }
-  if (c === "assign"){ const id = el.dataset.id; try { await S.db.doc("students/" + id).update({classId: el.value, assignAt: Date.now()}); toast("Групу змінено"); } catch(err){ toast("Не вдалося змінити групу"); } }
+  if (c === "assign"){ const id = el.dataset.id; if (!el.value && S.role !== "admin") return; const upd = {classId: el.value, assignAt: Date.now()}; if (S.role === "admin" && !S.students[id]?.classId) upd.joinBy = "admin";
+    try { await S.db.doc("students/" + id).update(upd); if (S.students[id]) Object.assign(S.students[id], upd); toast(el.value ? "Групу змінено" : "Студента прибрано з групи"); render(); } catch(err){ toast("Не вдалося змінити групу — немає прав"); } }
   else if (c === "cskind"){ const a = document.getElementById("cs-age"); if (a) a.innerHTML = ageOpts(el.value, a.value); }
   else if (c === "momonth"){ if (S.medit){ moOpen(S.medit.sid, el.value); render(); } }
   else if (c === "pomopreset"){ const p = pomoLoad(); p.preset = el.value; p.run = false; p.left = pomoLen(p.phase) * 60; p.end = 0; pomoSave(); const w = document.getElementById("pomo"); if (w) w.outerHTML = pomoHtml(); pomoTick(); }
